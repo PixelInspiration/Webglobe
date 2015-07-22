@@ -64,17 +64,22 @@ DAT.Globe = function(container, opts) {
 
   var curZoomSpeed = 0;
   var zoomSpeed = 50;
-
+	var projector;
+	
    var pointMesh = [],
     stopaMesh = [],
     dotMesh = [], 
   	dotData = [];
+  var cities = [];
+  var activeCity;
   
   var mouse = { x: 0, y: 0 }, mouseOnDown = { x: 0, y: 0 };
   
   var mouseOnDown = { x: 0, y: 0 };
   var mouseDownOn = false;
   
+  var delayTimer;
+    
   var rotation = { x: 0, y: 0 },
       target = { x: Math.PI*3/2, y: Math.PI / 6.0 },
       targetOnDown = { x: 0, y: 0 };
@@ -95,6 +100,8 @@ DAT.Globe = function(container, opts) {
     camera = new THREE.PerspectiveCamera(30, w / h, 1, 10000);
     camera.position.z = distance;
 
+	projector = new THREE.Projector();
+	
     scene = new THREE.Scene();
 
     var geometry = new THREE.SphereGeometry(200, 40, 30);
@@ -192,6 +199,13 @@ DAT.Globe = function(container, opts) {
 			 
 			alert(lat +":"+lng+":"+size+":"+color);
 			
+			pointMesh.push(point);
+			stopaMesh.push(stopa);
+
+			//meshes holding both line and bottom circle (stopa) for animating lines
+			dotMesh.push(point, stopa);
+			dotData.push(point.scale.z, stopa.scale.z);
+			
 			scene.add(point);
 			scene.add(stopa);
 			
@@ -279,10 +293,118 @@ DAT.Globe = function(container, opts) {
     for (i = 0; i < stopa.geometry.faces.length; i++) {
       stopa.geometry.faces[i].color = color;
     }
-	// scene.add(stopa);
-	// scene.add(this.point);
+	
+	cities.push({'position': point.position.clone(), 'color' : color, 'size' : size, 'lat' : lat, 'lng' : lng, 'title' : title});
+	
   }
 
+  
+  
+  function objectPick(event) {
+    var vector = new THREE.Vector3((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1, 0.5);
+    projector.unprojectVector(vector, camera);
+    var raycaster = new THREE.Raycaster(camera.position, vector.sub(camera.position).normalize());
+    var intersects = raycaster.intersectObject(mesh);
+
+    if (intersects.length > 0) {
+      return intersects[0].point;
+    }
+
+    return null;
+  }
+
+  function findClosestCity(point) {
+    point.sub(mesh.position).normalize();
+
+    var city;
+    var index = -1, best, dist;
+
+    for (var i = 0; i < cities.length; i++) {
+      city = cities[i].position.clone();
+      city.sub(mesh.position).normalize();
+      dist = city.dot(point);
+			
+      if (index === -1 || dist > best) {
+        index = i;
+        best = dist;
+      }
+    }
+
+    if (index === -1 || best < 0.9998) {
+      return -1;
+    }
+		
+    return index;
+  }
+
+  function clearActiveCity() {
+    if (activeCity !== -1) {
+      var saved = activeCity;
+      var tween = new TWEEN.Tween( {scalePoint: 2, scaleText: 1} )
+        .to({scalePoint: 1, scaleText: 0}, 200)
+        .easing(TWEEN.Easing.Cubic.EaseOut)
+        .onUpdate( function() {
+          pointMesh[saved].scale.x = this.scalePoint;
+          pointMesh[saved].scale.y = this.scalePoint;
+          pointMesh[saved].updateMatrix();
+        })
+        .onComplete( function() {
+        })
+        .start();
+          container.style.cursor = 'auto';
+
+      for (var i = 0; i < 3; i += 1) {
+        focusCircles[i].visible = false;
+        focusCircles[i].scale.x = 1;
+        focusCircles[i].scale.y = 1;
+      }
+      clearInterval(focusTimer);
+    }
+    activeCity = -1;
+  }
+
+  function setActiveCity(newCity) {
+    activeCity = newCity;
+    if (newCity !== -1) {
+      var tween = new TWEEN.Tween( {scalePoint: 1, scaleText: 0} )
+        .to({scalePoint: 2, scaleText: 1}, 200)
+        .easing(TWEEN.Easing.Cubic.EaseIn)
+        .onUpdate( function() {
+          pointMesh[newCity].scale.x = this.scalePoint;
+          pointMesh[newCity].scale.y = this.scalePoint;
+          pointMesh[newCity].updateMatrix();
+        })
+        .start();
+  
+      for (var i = 0; i < 3; i += 1) {
+        focusCircles[i].position = cities[activeCity].position;
+        focusCircles[i].lookAt(mesh.position);
+      }
+      innerRadius = 0;
+      focusTimer = setInterval( function() {
+        var radius = innerRadius;
+        for (var i = 0; i < 3; i += 1) {
+          if (radius <= 12) {
+            focusCircles[i].scale.x = radius / 4 + 1;
+            focusCircles[i].scale.y = radius / 4 + 1;
+          }
+          radius += 3;
+        }
+        innerRadius += 1;
+        if (innerRadius >= 12) {
+          innerRadius = 0;
+        }
+      }, 120);
+      for (i = 0; i < 3; i += 1) {
+        focusCircles[i].visible = true;
+      }
+    }
+  }
+
+ 
+  
+  
+  
   function onMouseDown(event) {
     event.preventDefault();
 
@@ -300,16 +422,35 @@ DAT.Globe = function(container, opts) {
   }
 
   function onMouseMove(event) {
-    mouse.x = - event.clientX;
-    mouse.y = event.clientY;
+  
+  if (mouseDownOn === true) {
+      mouse.x = - event.clientX;
+      mouse.y = event.clientY;
 
-    var zoomDamp = distance/1000;
+      var zoomDamp = distance / 1000;
 
-    target.x = targetOnDown.x + (mouse.x - mouseOnDown.x) * 0.005 * zoomDamp;
-    target.y = targetOnDown.y + (mouse.y - mouseOnDown.y) * 0.005 * zoomDamp;
+      target.x = targetOnDown.x + (mouse.x - mouseOnDown.x) * 0.005 * zoomDamp;
+      target.y = targetOnDown.y + (mouse.y - mouseOnDown.y) * 0.005 * zoomDamp;
 
-    target.y = target.y > PI_HALF ? PI_HALF : target.y;
-    target.y = target.y < - PI_HALF ? - PI_HALF : target.y;
+      target.y = target.y > Math.PI/2 ? Math.PI/2 : target.y;
+      target.y = target.y < -Math.PI/2 ? -Math.PI/2 : target.y;
+
+      clearActiveCity();
+    } else {
+      clearTimeout(delayTimer);
+      delayTimer = setTimeout(function() {
+        var intersectPoint = objectPick(event);
+        if (intersectPoint !== null) {
+          var city = findClosestCity(intersectPoint);
+          if (city !== activeCity) {
+            container.style.cursor = 'pointer';
+            clearActiveCity();
+            setActiveCity(city);
+          }
+        }
+      }, 10);
+    }  
+  
   }
 
   function onMouseUp(event) {
