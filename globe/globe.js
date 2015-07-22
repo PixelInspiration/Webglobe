@@ -86,7 +86,7 @@ DAT.Globe = function(container, opts) {
   var PI_HALF = Math.PI / 2;
 
   function init() {
-
+  
     container.style.color = '#fff';
     container.style.font = '13px/20px Arial, sans-serif';
 
@@ -116,7 +116,9 @@ DAT.Globe = function(container, opts) {
 
     mesh = new THREE.Mesh(geometry, material);
     mesh.rotation.y = Math.PI;
-    scene.add(mesh);
+    
+	scene.add(mesh);
+	
 
     shader = Shaders['atmosphere'];
     uniforms = THREE.UniformsUtils.clone(shader.uniforms);
@@ -135,6 +137,7 @@ DAT.Globe = function(container, opts) {
     mesh = new THREE.Mesh(geometry, material);
     mesh.scale.set( 1.1, 1.1, 1.1 );
     scene.add(mesh);
+	
 
     geometry = new THREE.BoxGeometry(0.75, 0.75, 1);
     geometry.applyMatrix(new THREE.Matrix4().makeTranslation(0,0,-0.5));
@@ -165,56 +168,33 @@ DAT.Globe = function(container, opts) {
     }, false);
   }
 
+   
+
+  
+  
+  
   function addData(data, opts) {
-    var lat, lng, size, color, i, step, colorFnWrapper;
+		var lat, lng, size, color, img, i, colorFnWrapper, slideshowURL;
+		
+		opts.animated = opts.animated || false;
+		this.is_animated = opts.animated;
+		step = 4;
+		colorFnWrapper = function(data, i) { return colorFn(2); }
 
-    opts.animated = opts.animated || false;
-    this.is_animated = opts.animated;
-    opts.format = opts.format || 'magnitude'; // other option is 'legend'
-    if (opts.format === 'magnitude') {
-      step = 3;
-      colorFnWrapper = function(data, i) { return colorFn(data[i+2]); }
-    } else if (opts.format === 'legend') {
-      step = 4;
-      colorFnWrapper = function(data, i) { return colorFn(data[i+3]); }
-    } else {
-      throw('error: format not supported: '+opts.format);
-    }
-
-    if (opts.animated) {
-      if (this._baseGeometry === undefined) {
-        this._baseGeometry = new THREE.Geometry();
-        for (i = 0; i < data.length; i += step) {
-          lat = data[i];
-          lng = data[i + 1];
-//        size = data[i + 2];
-          color = colorFnWrapper(data,i);
-          size = 0;
-          addPoint(lat, lng, size, color, this._baseGeometry);
-        }
-      }
-      if(this._morphTargetId === undefined) {
-        this._morphTargetId = 0;
-      } else {
-        this._morphTargetId += 1;
-      }
-      opts.name = opts.name || 'morphTarget'+this._morphTargetId;
-    }
-    var subgeo = new THREE.Geometry();
-    for (i = 0; i < data.length; i += step) {
-      lat = data[i];
-      lng = data[i + 1];
-      color = colorFnWrapper(data,i);
-      size = data[i + 2];
-      size = size*200;
-      addPoint(lat, lng, size, color, subgeo);
-    }
-    if (opts.animated) {
-      this._baseGeometry.morphTargets.push({'name': opts.name, vertices: subgeo.vertices});
-    } else {
-      this._baseGeometry = subgeo;
-    }
-
+		var subgeo = new THREE.Geometry();
+		
+		for (i = 0; i < data.length ; i++) {
+			
+			 lat = data[i][0];
+			 lng = data[i][1];
+			 size = 10;
+			 step = 4;
+			 color = colorFnWrapper(data[i], 0);
+			 addPoint(lat, lng, size, color, subgeo);
+			 
+			alert(lat +":"+lng+":"+size+":"+color);
+		}
+		this._baseGeometry = subgeo;
   };
 
   function createPoints() {
@@ -241,12 +221,19 @@ DAT.Globe = function(container, opts) {
               morphTargets: true
             }));
       }
-      scene.add(this.points);
+      // scene.add(this.points);
+	  // scene.add(stopa);
+	  
     }
   }
 
   function addPoint(lat, lng, size, color, subgeo) {
 
+   var material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      vertexColors: THREE.FaceColors
+    });
+  
     var phi = (90 - lat) * Math.PI / 180;
     var theta = (180 - lng) * Math.PI / 180;
 
@@ -268,6 +255,27 @@ DAT.Globe = function(container, opts) {
       point.updateMatrix();
     }
     subgeo.merge(point.geometry, point.matrix);
+	
+	
+	//Stopa
+    var stopalo = new THREE.CylinderGeometry(2, 2, 0, 14, 0, false);
+    stopa = new THREE.Mesh(stopalo, material);
+
+    stopa.position.x = 200 * Math.sin(phi) * Math.cos(theta);
+    stopa.position.y = 200 * Math.cos(phi);
+    stopa.position.z = 200 * Math.sin(phi) * Math.sin(theta);    
+    
+    //rotate the cylinder
+    stopalo.applyMatrix(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+  
+    stopa.lookAt(mesh.position);
+    
+
+    for (i = 0; i < stopa.geometry.faces.length; i++) {
+      stopa.geometry.faces[i].color = color;
+    }
+	scene.add(stopa);
+	scene.add(this.point);
   }
 
   function onMouseDown(event) {
