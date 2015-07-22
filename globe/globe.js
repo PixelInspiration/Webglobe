@@ -1,17 +1,6 @@
-/**
- * dat.globe Javascript WebGL Globe Toolkit
- * http://dataarts.github.com/dat.globe
- *
- * Copyright 2011 Data Arts Team, Google Creative Lab
- *
- * Licensed under the Apache License, Version 2.0 (the 'License');
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- */
-
 var DAT = DAT || {};
+var initZoom, initCard;
+
 
 DAT.Globe = function(container, opts) {
   opts = opts || {};
@@ -76,7 +65,16 @@ DAT.Globe = function(container, opts) {
   var curZoomSpeed = 0;
   var zoomSpeed = 50;
 
+   var pointMesh = [],
+    stopaMesh = [],
+    dotMesh = [], 
+  	dotData = [];
+  
   var mouse = { x: 0, y: 0 }, mouseOnDown = { x: 0, y: 0 };
+  
+  var mouseOnDown = { x: 0, y: 0 };
+  var mouseDownOn = false;
+  
   var rotation = { x: 0, y: 0 },
       target = { x: Math.PI*3/2, y: Math.PI / 6.0 },
       targetOnDown = { x: 0, y: 0 };
@@ -134,9 +132,9 @@ DAT.Globe = function(container, opts) {
 
         });
 
-    mesh = new THREE.Mesh(geometry, material);
-    mesh.scale.set( 1.1, 1.1, 1.1 );
-    scene.add(mesh);
+    atmosphereMesh = new THREE.Mesh(geometry, material);
+    atmosphereMesh.scale.set( 1.1, 1.1, 1.1 );
+    scene.add(atmosphereMesh);
 	
 
     geometry = new THREE.BoxGeometry(0.75, 0.75, 1);
@@ -187,12 +185,16 @@ DAT.Globe = function(container, opts) {
 			
 			 lat = data[i][0];
 			 lng = data[i][1];
-			 size = 10;
+			 size = 50;
 			 step = 4;
 			 color = colorFnWrapper(data[i], 0);
 			 addPoint(lat, lng, size, color, subgeo);
 			 
 			alert(lat +":"+lng+":"+size+":"+color);
+			
+			scene.add(point);
+			scene.add(stopa);
+			
 		}
 		this._baseGeometry = subgeo;
   };
@@ -237,6 +239,9 @@ DAT.Globe = function(container, opts) {
     var phi = (90 - lat) * Math.PI / 180;
     var theta = (180 - lng) * Math.PI / 180;
 
+	point3d = new THREE.BoxGeometry(1, 1, 0.5);
+  	point = new THREE.Mesh(point3d, material);
+	
     point.position.x = 200 * Math.sin(phi) * Math.cos(theta);
     point.position.y = 200 * Math.cos(phi);
     point.position.z = 200 * Math.sin(phi) * Math.sin(theta);
@@ -244,7 +249,7 @@ DAT.Globe = function(container, opts) {
     point.lookAt(mesh.position);
 
     point.scale.z = Math.max( size, 0.1 ); // avoid non-invertible matrix
-    point.updateMatrix();
+    // point.updateMatrix();
 
     for (var i = 0; i < point.geometry.faces.length; i++) {
 
@@ -274,8 +279,8 @@ DAT.Globe = function(container, opts) {
     for (i = 0; i < stopa.geometry.faces.length; i++) {
       stopa.geometry.faces[i].color = color;
     }
-	scene.add(stopa);
-	scene.add(this.point);
+	// scene.add(stopa);
+	// scene.add(this.point);
   }
 
   function onMouseDown(event) {
