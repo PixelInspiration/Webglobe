@@ -93,7 +93,7 @@
 </head>
 <body>
 
-<div id="container"></div>
+<div id="container" touch-action="pan-x pan-y"></div>
 
 <div id="info">
   The <a href="http://www.chromeexperiments.com/globe">WebGL Globe</a> is an
@@ -113,7 +113,8 @@
 
 <script type="text/javascript" src="/globe/third-party/Detector.js"></script>
 <script type="text/javascript" src="/globe/third-party/three.min.js"></script>
-<script type="text/javascript" src="/globe/globe.js"></script>
+<script type="text/javascript" src="/polymer-globe/polymer/polymer-all/PointerEvents/src/pointerevent.js"></script>
+<script type="text/javascript" src="globe.js"></script>
 <script type="text/javascript">
 
   var globe = DAT.Globe(document.getElementById('container'), {

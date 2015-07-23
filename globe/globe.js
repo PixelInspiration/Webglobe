@@ -190,7 +190,7 @@ DAT.Globe = function(container, opts) {
 			 color = colorFnWrapper(data[i], 0);
 			 addPoint(lat, lng, size, color, subgeo);
 			 
-			alert(lat +":"+lng+":"+size+":"+color);
+		
 			
 			scene.add(point);
 			scene.add(stopa);
