@@ -1,364 +1,182 @@
-var DAT = DAT || {},
-  initZoom,
-  initCard;
+var DAT = DAT || {};
+var initZoom, initCard;
+
 
 DAT.Globe = function(container, opts) {
   opts = opts || {};
   
-  colorFn = opts.colorFn || function (color) {
+  var colorFn = opts.colorFn || function(x) {
     var c = new THREE.Color();
-    c.setStyle(color);
+    c.setHSL( ( 0.6 - ( x * 0.5 ) ), 1.0, 0.5 );
     return c;
   };
+  var imgDir = opts.imgDir || '/globe/';
 
-  var imgDir = opts.imgDir || '/globe/',
-    Shaders = {
-      'earth' : {
-        uniforms: {
-          'texture': { type: 't', value: null }
-        },
-				vertexShader: [
-				  'varying vec3 vNormal;',
-				  'varying vec2 vUv;',
-				  'void main() {',
-				  'gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );',
-				  'vNormal = normalize( normalMatrix * normal );',
-				  'vUv = uv;',
-		      '}'
-				].join('\n'),
-				fragmentShader: [
-				  'uniform sampler2D texture;',
-				  'varying vec3 vNormal;',
-				  'varying vec2 vUv;',
-				  'void main() {',
-				  'vec3 diffuse = texture2D( texture, vUv ).xyz;',
-				  'float intensity = 1.05 - dot( vNormal, vec3( 0.0, 0.0, 1.0 ) );',
-				  'vec3 atmosphere = vec3( 1.0, 0.0, 1.0 ) * pow( intensity, 3.0 );',
-				  'gl_FragColor = vec4( diffuse + atmosphere, 1.0 );',
-				  '}'
-				].join('\n')
+  var Shaders = {
+    'earth' : {
+      uniforms: {
+        'texture': { type: 't', value: null }
       },
-      'atmosphere' : {
-		    uniforms: {},
-		    vertexShader: [
-				  'varying vec3 vNormal;',
-				  'void main() {',
-				  'vNormal = normalize( normalMatrix * normal );',
-				  'gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );',
-				  '}'
-				].join('\n'),
-				fragmentShader: [
-				  'varying vec3 vNormal;',
-				  'void main() {',
-				  'float intensity = pow( 0.8 - dot( vNormal, vec3( 0, 0, 1.0 ) ), 12.0 );',
-				  'gl_FragColor = vec4( 1.0, 0.5, 0.5, 1.0 ) * intensity;',
-				  '}'
-				].join('\n')
-      }
+      vertexShader: [
+        'varying vec3 vNormal;',
+        'varying vec2 vUv;',
+        'void main() {',
+          'gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );',
+          'vNormal = normalize( normalMatrix * normal );',
+          'vUv = uv;',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'uniform sampler2D texture;',
+        'varying vec3 vNormal;',
+        'varying vec2 vUv;',
+        'void main() {',
+          'vec3 diffuse = texture2D( texture, vUv ).xyz;',
+          'float intensity = 1.05 - dot( vNormal, vec3( 0.0, 0.0, 1.0 ) );',
+          'vec3 atmosphere = vec3( 1.0, 1.0, 1.0 ) * pow( intensity, 3.0 );',
+          'gl_FragColor = vec4( diffuse + atmosphere, 1.0 );',
+        '}'
+      ].join('\n')
     },
+    'atmosphere' : {
+      uniforms: {},
+      vertexShader: [
+        'varying vec3 vNormal;',
+        'void main() {',
+          'vNormal = normalize( normalMatrix * normal );',
+          'gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'varying vec3 vNormal;',
+        'void main() {',
+          'float intensity = pow( 0.8 - dot( vNormal, vec3( 0, 0, 1.0 ) ), 12.0 );',
+          'gl_FragColor = vec4( 1.0, 1.0, 1.0, 1.0 ) * intensity;',
+        '}'
+      ].join('\n')
+    }
+  };
 
+  var camera, scene, renderer, w, h;
+  var mesh, atmosphere, point;
 
-    camera,
-    scene,
-    renderer,
-    projector,
-    sphere,
-    point,
-    atmosphereMesh,
-  //global meshes
-    pointMesh = [],
+  var overRenderer;
+
+  var curZoomSpeed = 0;
+  var zoomSpeed = 50;
+	var projector;
+	
+   var pointMesh = [],
     stopaMesh = [],
     dotMesh = [], 
-  	dotData = [], //this array will clone scale.z data needed to remember line height for each dot when filtering
-    circleMesh,
-    focusCircles = [],
-    innerRadius,
-    cities = [],
-    activeCity = -1,
-    testArr = [],
-    overRenderer = false,
-    curZoomSpeed = 0,
-    mouse = { x: 0, y: 0 },
-    mouseOnDown = { x: 0, y: 0 },
-    mouseDownOn = false,
-    rotation = { x: 4, y: 1 },
-    target = { x: Math.PI * 3 / 2, y: Math.PI / 6.0 },
-    targetOnDown = { x: 0, y: 0 },
-    distance = 10000,
-    distanceTarget = 10000,
-    delayTimer,
-    focusTimer;
+  	dotData = [];
+  var cities = [];
+  var activeCity;
+  
+  var mouse = { x: 0, y: 0 }, mouseOnDown = { x: 0, y: 0 };
+  
+  var mouseOnDown = { x: 0, y: 0 };
+  var mouseDownOn = false;
+  
+  var delayTimer;
+    
+  var rotation = { x: 0, y: 0 },
+      target = { x: Math.PI*3/2, y: Math.PI / 6.0 },
+      targetOnDown = { x: 0, y: 0 };
 
-	/**
-	 * Initialize globe
-	 */
+  var distance = 100000, distanceTarget = 100000;
+  var padding = 40;
+  var PI_HALF = Math.PI / 2;
+
   function init() {
-		
-		var shader, uniforms, material, w, h;
-
+  
     container.style.color = '#fff';
     container.style.font = '13px/20px Arial, sans-serif';
 
+    var shader, uniforms, material;
     w = container.offsetWidth || window.innerWidth;
     h = container.offsetHeight || window.innerHeight;
 
-    // camera & scene {{{
-    camera = new THREE.PerspectiveCamera(30, w / h, 1, 20000);
+    camera = new THREE.PerspectiveCamera(30, w / h, 1, 10000);
     camera.position.z = distance;
-    
 
-    projector = new THREE.Projector();
+	projector = new THREE.Projector();
+	
     scene = new THREE.Scene();
-    // }}}
 
-    // globe {{{
     var geometry = new THREE.SphereGeometry(200, 40, 30);
 
-    shader = Shaders.earth;
+    shader = Shaders['earth'];
     uniforms = THREE.UniformsUtils.clone(shader.uniforms);
 
-    //THREE.ImageUtils.crossOrigin = "http://qz.com";
+    uniforms['texture'].value = THREE.ImageUtils.loadTexture(imgDir+'world.jpg');
 
-		uniforms.texture.value = THREE.ImageUtils.loadTexture(imgDir + 'world.jpg');
+    material = new THREE.ShaderMaterial({
 
-		material = new THREE.ShaderMaterial({
+          uniforms: uniforms,
+          vertexShader: shader.vertexShader,
+          fragmentShader: shader.fragmentShader
 
-      uniforms: uniforms,
-      vertexShader: shader.vertexShader,
-      fragmentShader: shader.fragmentShader
+        });
 
-		});
+    mesh = new THREE.Mesh(geometry, material);
+    mesh.rotation.y = Math.PI;
+    
+	scene.add(mesh);
+	
 
-		sphere = new THREE.Mesh(geometry, material);
-		sphere.rotation.y = Math.PI;
-		scene.add(sphere);
-    // }}}
-
-    // atmosphere {{{
-    shader = Shaders.atmosphere;
+    shader = Shaders['atmosphere'];
     uniforms = THREE.UniformsUtils.clone(shader.uniforms);
 
     material = new THREE.ShaderMaterial({
 
-      uniforms: uniforms,
-      vertexShader: shader.vertexShader,
-      fragmentShader: shader.fragmentShader,
-      side: THREE.BackSide,
-      blending: THREE.AdditiveBlending,
-      transparent: true
+          uniforms: uniforms,
+          vertexShader: shader.vertexShader,
+          fragmentShader: shader.fragmentShader,
+          side: THREE.BackSide,
+          blending: THREE.AdditiveBlending,
+          transparent: true
 
-    });
+        });
 
     atmosphereMesh = new THREE.Mesh(geometry, material);
-    atmosphereMesh.scale.set(1.1, 1.1, 1.1);
-    atmosphereMesh.name = 'atmosphere';
+    atmosphereMesh.scale.set( 1.1, 1.1, 1.1 );
     scene.add(atmosphereMesh);
-    // }}}
-		
 	
 
-    // hollow-circle && focus-circle {{{
-    geometry = new THREE.Geometry();
+    geometry = new THREE.BoxGeometry(0.75, 0.75, 1);
+    geometry.applyMatrix(new THREE.Matrix4().makeTranslation(0,0,-0.5));
 
-    for (var i = 0; i <= 32; i += 1) {
-      var x = Math.cos(i / 32 * 2 * Math.PI),
-        y = Math.sin(i / 32 * 2 * Math.PI),
-        vertex = new THREE.Vector3(x, y, 0);
-      geometry.vertices.push(vertex);
-    }
-    material = new THREE.LineBasicMaterial({
-      color: 0xcccccc,
-      linewidth: 1
-    });
-    circleMesh = new THREE.Line(geometry, material);
-    for (i = 0; i < 3; i += 1) {
-      focusCircles.push(circleMesh.clone());
-    }
-    for (i = 0; i < 3; i += 1) {
-      focusCircles[i].visible = false;
-      scene.add(focusCircles[i]);
-    }
-    // }}}
+    point = new THREE.Mesh(geometry);
 
-
-    
     renderer = new THREE.WebGLRenderer({antialias: true});
     renderer.setSize(w, h);
+
     renderer.domElement.style.position = 'absolute';
 
     container.appendChild(renderer.domElement);
+
     container.addEventListener('mousedown', onMouseDown, false);
-    container.addEventListener('mousemove', onMouseMove, false);
-    container.addEventListener('mouseover', function () {
+
+    container.addEventListener('mousewheel', onMouseWheel, false);
+
+    document.addEventListener('keydown', onDocumentKeyDown, false);
+
+    window.addEventListener('resize', onWindowResize, false);
+
+    container.addEventListener('mouseover', function() {
       overRenderer = true;
     }, false);
-    container.addEventListener('mouseout', function () {
+
+    container.addEventListener('mouseout', function() {
       overRenderer = false;
-      clearActiveCity();
     }, false);
-
-
-    camera.aspect = window.innerWidth / window.innerHeight;
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    camera.updateProjectionMatrix();
   }
 
-	/** 
-	 * Add cities on globe
-	 */
-  function addCity(lat, lng, size, city, color, img, slideshowURL) {
-    var material = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      vertexColors: THREE.FaceColors
-    }),
+   
 
-    phi = (90 - lat) * Math.PI / 180,
-    theta = (180 - lng) * Math.PI / 180,
-	
-	point3d = new THREE.BoxGeometry(1, 1, 0.5);
-  	point = new THREE.Mesh(point3d, material);
-    
-	
-    point.position.x = 200 * Math.sin(phi) * Math.cos(theta);
-    point.position.y = 200 * Math.cos(phi);
-    point.position.z = 200 * Math.sin(phi) * Math.sin(theta);
-
-    point.scale.z = Math.max(size, 0.1); // avoid non-invertible matrix
-		
-    point.lookAt(sphere.position);
-    var i;
-
-    for (i = 0; i < point.geometry.faces.length; i++) {
-      point.geometry.faces[i].color = color;
-    }
-      
-	
-		
-	//Stopa
-    var stopalo = new THREE.CylinderGeometry(2, 2, 0, 14, 0, false);
-    stopa = new THREE.Mesh(stopalo, material);
-
-    stopa.position.x = 200 * Math.sin(phi) * Math.cos(theta);
-    stopa.position.y = 200 * Math.cos(phi);
-    stopa.position.z = 200 * Math.sin(phi) * Math.sin(theta);
-
-    stopa.themeState = 'on';
-    stopa.formatState = 'on';
-    
-
-    //rotate the cylinder
-    stopalo.applyMatrix(new THREE.Matrix4().makeRotationX(Math.PI / 2));
   
-    stopa.lookAt(sphere.position);
-    
-
-    for (i = 0; i < stopa.geometry.faces.length; i++) {
-      stopa.geometry.faces[i].color = color;
-    }
-
-		
-		// cities.push({'position': point.position.clone(), 'img': img, 'color' : color, 'size' : size, 'lat' : lat, 'lng' : lng, 'title' : title, 'desc' : desc, 'link': link, 'themes' : themes, 'format' : format, 'region': region, 'slideshowURL': slideshowURL});
-  }
-	
-		
-/*	var addData = function(data) {
-	
-	  var lat, lng, size, color, img, i, colorFnWrapper, slideshowURL;
-
-    colorFnWrapper = function(data, i) { return colorFn(); };
-
-    
- 
-		
-		for (i = 0; i < data.length ; i++) {
-
-			color = colorFnWrapper(data, i);
-
-			city = data[i][0];
-			lat = data[i][1];
-			lng = data[i][2];
-
-			//converting date to size based on number of days
-			var minMilli = 1000 * 60;
-			var hrMilli = minMilli * 60;
-			var dyMilli = hrMilli * 24;
-
-			var testDate = Date.parse(new Date());
-			var testDate2 = Date.parse(data[i][3]);
-			var ms = testDate-testDate2;
-			var days = Math.round(ms / dyMilli);
-
-			//With days we"re getting proper values, but we want to display them in reverse order: greater the number of days, taller the line and vice versa
-			size = 2*365-days;
-
-			//fallback if the line becomes too small
-			if (size < 100) {
-				size = 100;
-			}
-
-			//or too big
-			if ( size > 800 ) {
-				size = 800;
-			}
-
-
-			img = data[i][4];
-			title = data[i][5];
-			desc = data[i][6];
-			link = data[i][7];
-			themes = data[i][8];
-			format = data[i][9];
-			region = data[i][10];
-
-			if (format === 'slideshow') {
-				slideshowURL = data[i][11];
-			}
-     
-      addCity(lat, lng, size, city, color, img, slideshowURL, themes, format);
-     
-			
-			//Themes filter
-			switch (themes){
-				case 'industrial internet':
-				color.setStyle('#f7c438');
-				break;
-				case 'energy':
-				color.setStyle('#d2fd3a');
-				break;
-				case 'healthcare':
-				color.setStyle('#d77fe8');
-				break;
-				case 'skills & work':
-				color.setStyle('#4edee2');
-				break;
-				case 'transportation':
-				color.setStyle('#ff8046');
-				break;
-				case 'manufacturing':
-				color.setStyle('#d3217a');
-				break;
-				case 'infrastructure':
-				color.setStyle('#35ba8a');
-				break;
-				case 'gestore':
-				color.setStyle('#ed0959');
-				break;
-				default: color.setStyle('white');
-			}
-			
-			
-			pointMesh.push(point);
-			stopaMesh.push(stopa);
-
-			//meshes holding both line and bottom circle (stopa) for animating lines
-			dotMesh.push(point, stopa);
-			dotData.push(point.scale.z, stopa.scale.z);
-			
-			scene.add(point);
-			scene.add(stopa);
-		}
-  };
-  */
+  
   
   function addData(data, opts) {
 		var lat, lng, size, color, img, i, colorFnWrapper, slideshowURL;
@@ -377,7 +195,7 @@ DAT.Globe = function(container, opts) {
 			 size = 50;
 			 step = 4;
 			 color = colorFnWrapper(data[i], 0);
-			 addCity(lat, lng, size, color, subgeo);
+			 addPoint(lat, lng, size, color, subgeo);
 			 
 			alert(lat +":"+lng+":"+size+":"+color);
 			
@@ -395,65 +213,98 @@ DAT.Globe = function(container, opts) {
 		this._baseGeometry = subgeo;
   };
 
-				
-	//Article		
-	/* articleF.click(function() {
-		
-		$(this).toggleClass('off');
-		 	
-		if ($(this).hasClass('off')) {
-			
-			$.each(dotMesh, function(index, value) {
-
-				if (dotMesh[index].format === 'article') {
-
-					dotMesh[index].formatState = 'off';
-
-					if (dotMesh[index].themeState !== 'off') {
-
-						var tween = new TWEEN.Tween( {scaleZ: dotData[index]} )
-		        .to({scaleZ: 1}, 200)
-		        .easing(TWEEN.Easing.Cubic.EaseOut)
-		        .onUpdate( function() {
-		          dotMesh[index].scale.z = this.scaleZ;
-		        })
-		        .onComplete( function() {
-		          dotMesh[index].visible = false;
-		        })
-		        .start();
-		      }
+  function createPoints() {
+    if (this._baseGeometry !== undefined) {
+      if (this.is_animated === false) {
+        this.points = new THREE.Mesh(this._baseGeometry, new THREE.MeshBasicMaterial({
+              color: 0xffffff,
+              vertexColors: THREE.FaceColors,
+              morphTargets: false
+            }));
+      } else {
+        if (this._baseGeometry.morphTargets.length < 8) {
+          console.log('t l',this._baseGeometry.morphTargets.length);
+          var padding = 8-this._baseGeometry.morphTargets.length;
+          console.log('padding', padding);
+          for(var i=0; i<=padding; i++) {
+            console.log('padding',i);
+            this._baseGeometry.morphTargets.push({'name': 'morphPadding'+i, vertices: this._baseGeometry.vertices});
+          }
         }
-			});
-		}
-		else {
-			$.each(dotMesh, function(index, value) {
+        this.points = new THREE.Mesh(this._baseGeometry, new THREE.MeshBasicMaterial({
+              color: 0xffffff,
+              vertexColors: THREE.FaceColors,
+              morphTargets: true
+            }));
+      }
+      // scene.add(this.points);
+	  // scene.add(stopa);
+	  
+    }
+  }
 
-				if (dotMesh[index].format === 'article') {
+  function addPoint(lat, lng, size, color, subgeo) {
 
-					dotMesh[index].formatState = 'on';
+   var material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      vertexColors: THREE.FaceColors
+    });
+  
+    var phi = (90 - lat) * Math.PI / 180;
+    var theta = (180 - lng) * Math.PI / 180;
 
-					if (dotMesh[index].themeState !== 'off') {
-
-						var tween = new TWEEN.Tween( {scaleZ: 0} )
-		        .to({scaleZ: dotData[index]}, 200)
-		        .easing(TWEEN.Easing.Cubic.EaseOut)
-		        .onUpdate( function() {
-							dotMesh[index].visible = true;
-		          dotMesh[index].scale.z = this.scaleZ;
-		        })
-		        .start();
-			    }
-				}
-			});
-		}
-	}); */
+	point3d = new THREE.BoxGeometry(1, 1, 0.5);
+  	point = new THREE.Mesh(point3d, material);
 	
+    point.position.x = 200 * Math.sin(phi) * Math.cos(theta);
+    point.position.y = 200 * Math.cos(phi);
+    point.position.z = 200 * Math.sin(phi) * Math.sin(theta);
 
+    point.lookAt(mesh.position);
+
+    point.scale.z = Math.max( size, 0.1 ); // avoid non-invertible matrix
+    // point.updateMatrix();
+
+    for (var i = 0; i < point.geometry.faces.length; i++) {
+
+      point.geometry.faces[i].color = color;
+
+    }
+    if(point.matrixAutoUpdate){
+      point.updateMatrix();
+    }
+    subgeo.merge(point.geometry, point.matrix);
+	
+	
+	//Stopa
+    var stopalo = new THREE.CylinderGeometry(2, 2, 0, 14, 0, false);
+    stopa = new THREE.Mesh(stopalo, material);
+
+    stopa.position.x = 200 * Math.sin(phi) * Math.cos(theta);
+    stopa.position.y = 200 * Math.cos(phi);
+    stopa.position.z = 200 * Math.sin(phi) * Math.sin(theta);    
+    
+    //rotate the cylinder
+    stopalo.applyMatrix(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+  
+    stopa.lookAt(mesh.position);
+    
+
+    for (i = 0; i < stopa.geometry.faces.length; i++) {
+      stopa.geometry.faces[i].color = color;
+    }
+	
+	cities.push({'position': point.position.clone(), 'color' : color, 'size' : size, 'lat' : lat, 'lng' : lng, 'title' : title});
+	
+  }
+
+  
+  
   function objectPick(event) {
     var vector = new THREE.Vector3((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1, 0.5);
     projector.unprojectVector(vector, camera);
     var raycaster = new THREE.Raycaster(camera.position, vector.sub(camera.position).normalize());
-    var intersects = raycaster.intersectObject(sphere);
+    var intersects = raycaster.intersectObject(mesh);
 
     if (intersects.length > 0) {
       return intersects[0].point;
@@ -463,23 +314,19 @@ DAT.Globe = function(container, opts) {
   }
 
   function findClosestCity(point) {
-    point.sub(sphere.position).normalize();
+    point.sub(mesh.position).normalize();
 
     var city;
     var index = -1, best, dist;
 
     for (var i = 0; i < cities.length; i++) {
       city = cities[i].position.clone();
-      city.sub(sphere.position).normalize();
+      city.sub(mesh.position).normalize();
       dist = city.dot(point);
 			
       if (index === -1 || dist > best) {
         index = i;
         best = dist;
-				//Checking if any of the filters is turned on - otherwise point would remain clickable even if the line is hidden
-					// if (cities[i].format === 'article' && articleF.hasClass('off') || cities[i].format === 'slideshow' && slideshowF.hasClass('off') || cities[i].format === 'video' && videoF.hasClass('off') || cities[i].format === 'infographic' && infographicF.hasClass('off') || cities[i].format === 'social' && socialF.hasClass('off') || cities[i].themes === 'industrial internet' && internetT.hasClass('off') || cities[i].themes === 'energy' && energyT.hasClass('off') || cities[i].themes === 'healthcare' && healthT.hasClass('off') || cities[i].themes === 'skills & work' && skillsT.hasClass('off') || cities[i].themes === 'transportation' && transportationT.hasClass('off') || cities[i].themes === 'manufacturing' && manufacturingT.hasClass('off') || cities[i].themes === 'infrastructure' && infrastructureT.hasClass('off') || cities[i].themes === 'gestore' && gestoreT.hasClass('off')) {
-						best = 0;
-					// }
       }
     }
 
@@ -531,7 +378,7 @@ DAT.Globe = function(container, opts) {
   
       for (var i = 0; i < 3; i += 1) {
         focusCircles[i].position = cities[activeCity].position;
-        focusCircles[i].lookAt(sphere.position);
+        focusCircles[i].lookAt(mesh.position);
       }
       innerRadius = 0;
       focusTimer = setInterval( function() {
@@ -554,10 +401,14 @@ DAT.Globe = function(container, opts) {
     }
   }
 
+ 
+  
+  
+  
   function onMouseDown(event) {
-  	
     event.preventDefault();
 
+    container.addEventListener('mousemove', onMouseMove, false);
     container.addEventListener('mouseup', onMouseUp, false);
     container.addEventListener('mouseout', onMouseOut, false);
 
@@ -568,13 +419,11 @@ DAT.Globe = function(container, opts) {
     targetOnDown.y = target.y;
 
     container.style.cursor = 'move';
-
-    mouseDownOn = true;
   }
-  
-  function onMouseMove(event) {
 
-    if (mouseDownOn === true) {
+  function onMouseMove(event) {
+  
+  if (mouseDownOn === true) {
       mouse.x = - event.clientX;
       mouse.y = event.clientY;
 
@@ -601,578 +450,114 @@ DAT.Globe = function(container, opts) {
         }
       }, 10);
     }  
+  
   }
-
 
   function onMouseUp(event) {
+    container.removeEventListener('mousemove', onMouseMove, false);
     container.removeEventListener('mouseup', onMouseUp, false);
     container.removeEventListener('mouseout', onMouseOut, false);
     container.style.cursor = 'auto';
-
-    if (activeCity != -1) {
-			///////POPUP CONTENT/////////
-			
-			//getting click coordinates
-			var x = event.clientX;
-			var y = event.clientY;
-
-      var card = cities[activeCity].title;
-			
-      
-      //setting background image
-      var bgImg = 'url(' + cities[activeCity].img + ')';
-
-      //POPUP
-      overlay.velocity('fadeIn', { duration: 250 });
-			popup.velocity('fadeIn', { duration: 250 });
-      popup.css('background-image', bgImg);
-			
-
- 			//article		
-			videoLink.hide();
-			slideshowLink.hide();
-			aLink.show();
-      aTitle.html(cities[activeCity].title).css('color', cities[activeCity].color.getStyle());
-			aDesc.html(cities[activeCity].desc);
-			aLink.attr('href', cities[activeCity].link).css('background-color', cities[activeCity].color.getStyle());
-			
-			videoLink.css('background-color', cities[activeCity].color.getStyle());
-			slideshowLink.css('background-color', cities[activeCity].color.getStyle());
-
-			tagTheme.html(cities[activeCity].themes).css('color', cities[activeCity].color.getStyle());
-			tagFormat.html(cities[activeCity].format);
-			$('.article').show();
-						
-				//social shares
-			
-				$('.fb').attr('href' , 'https://www.facebook.com/sharer/sharer.php?u=' + cities[activeCity].link + '&t=' + cities[activeCity].title);
-				$('.twitter').attr('href' , 'https://twitter.com/intent/tweet?text=%23GEWorldInMotion ' + cities[activeCity].title + ': ' + cities[activeCity].link);
-				$('.linkedin').attr('href', 'http://www.linkedin.com/shareArticle?mini=true&url=' + cities[activeCity].link + '&title=%23GEWorldInMotion ' + cities[activeCity].title);
-			
-			
-			//slideshow
-	 		if(cities[activeCity].format === 'slideshow') {
-			
-				$('.images').css('background-image', 'url("' + cities[activeCity].link[0] + '")');
-
-				//hiding social share icons since there is no link to be shared
-				$('.social').hide();
-
-				$('.slideshow-url a').attr('href', cities[activeCity].slideshowURL).css('color', aLink.css('background-color'));
-	 			$('.slideshow-url').show();
-
-				slideshowLink.show();
-				aLink.hide();
-				
-				slideshowLink.on('click', function() {
-					slideshowContainer.show();
-				});
-
-
-				slideshowStart = (function() {
-
-		     	var images = [],
-		     	curIndex = 0;
-		      
-		      for (var i = 0; i < cities[activeCity].link.length; i++) {
-		        images.push(cities[activeCity].link[i]);
-		      }
-		      
-		      var gotoImage = function (index) {
-		      	
-              
-		          $('.images').each(function (i) {
-		             var image = curIndex + i;
-		              if (image >= images.length) {
-		                  image = image - images.length;
-		              }
-		             $(this).css("background-image", 'url("' + images[image] + '")');
-		          });
-		      };
-
-					return {
-							next: function() {
-								
-		            curIndex++;
-		            if (curIndex === images.length) {
-		                curIndex = 0;
-		            }
-		            gotoImage(curIndex);
-							},
-							prev: function() {
-
-		            curIndex--;
-		            if (curIndex === -1) {
-		                curIndex = images.length - 1;
-		            }
-		            gotoImage(curIndex);
-							}
-					};
-				})();				
-			}
-			else {
-				$('.social').show();
-				$('.slideshow-url').hide();
-				slideshowContainer.hide();
-			}
-
-								//very quick  fix - for preview only
-						if (cities[activeCity].lng === 75.3629674) {
-							slideshowContainer.addClass('big-slider');
-						}
-						else {
-							slideshowContainer.removeClass('big-slider');
-						}
-			
-
-
-
-			//Arrows listing/navigation	
-			var i = 0;
-			testArr = [];
-
-
-
-			//India
-			if (cities[activeCity].region === 'India') {
-				while (i < dataIN.length) {
-					if (dataIN[i][8] === cities[activeCity].themes) {
-						 testArr.push(dataIN[i]);
-					}
-					i++;
-				}
-			}
-			//Africa
-			else if (cities[activeCity].region === 'Africa') {
-				while (i < dataAF.length) {
-					if (dataAF[i][8] === cities[activeCity].themes) {
-						testArr.push(dataAF[i]);
-					}
-					i++;
-				}
-			}
-			//Europe
-			else if (cities[activeCity].region === 'Europe') {
-				while (i < dataEU.length) {
-					if (dataEU[i][8] === cities[activeCity].themes) {
-						testArr.push(dataEU[i]);
-					}
-					i++;
-				}
-			}
-			//Canada
-			else if (cities[activeCity].region === 'Canada') {
-				while (i < dataCA.length) {
-					if (dataCA[i][8] === cities[activeCity].themes) {
-						testArr.push(dataCA[i]);
-					}
-					i++;
-				}
-			}			
-			//Australia
-			else if (cities[activeCity].region === 'Australia') {
-				while (i < dataAU.length) {
-					if (dataAU[i][8] === cities[activeCity].themes) {
-						testArr.push(dataAU[i]);
-					}
-					i++;
-				}
-			}
-			//US
-			else if (cities[activeCity].region === 'US') {
-				while (i < dataUS.length) {
-					if (dataUS[i][8] === cities[activeCity].themes) {
-						testArr.push(dataUS[i]);
-					}
-					i++;
-				}
-			}
-      //GE Reports
-			else if (cities[activeCity].region === 'gestore') {
-				while (i < dataGESTORE.length) {
-					if (dataGESTORE[i][8] === cities[activeCity].themes) {
-						testArr.push(dataGESTORE[i]);
-					}
-					i++;
-				}
-			}
-      //Japan
-			else if (cities[activeCity].region === 'japan') {
-				while (i < dataJP.length) {
-					if (dataJP[i][8] === cities[activeCity].themes) {
-						testArr.push(dataJP[i]);
-					}
-					i++;
-				}
-			}
-      //MENAT
-			else if (cities[activeCity].region === 'menat') {
-				while (i < dataMENAT.length) {
-					if (dataMENAT[i][8] === cities[activeCity].themes) {
-						testArr.push(dataMENAT[i]);
-					}
-					i++;
-				}
-			}
-			//China
-			else if (cities[activeCity].region === 'china') {
-				while (i < dataCN.length) {
-					if (dataCN[i][8] === cities[activeCity].themes) {
-						testArr.push(dataCN[i]);
-					}
-					i++;
-				}
-			}
-			//Brazil
-			else if (cities[activeCity].region === 'brazil') {
-				while (i < dataBR.length) {
-					if (dataBR[i][8] === cities[activeCity].themes) {
-						testArr.push(dataBR[i]);
-					}
-					i++;
-				}
-			}
-      //Korea
-      else if (cities[activeCity].region === 'korea') {
-        while (i < dataKR.length) {
-          if (dataKR[i][8] === cities[activeCity].themes) {
-            testArr.push(dataKR[i]);
-          }
-          i++;
-        }
-      }       		
-
-
-      //TESTING ANALYTICS
-      //piwik
-      popup.attr('data-content-name', aTitle.html());
-			
-			//GA
-			var contentPiece = $('.article-title').html();
-			ga('send', {
-			  'hitType': 'event',          // Required.
-			  'eventCategory': 'content',   // Required.
-			  'eventAction': 'click',      // Required.
-			  'eventLabel': contentPiece,
-			  'eventValue': 4
-			});
-	
-		 arrowNav = (function() {
-			var currentDot = -1;
-
-			if (testArr.length === 1) {
-				$('.nav-arrow-next, .nav-arrow-prev').hide();
-			} else {
-				$('.nav-arrow-next, .nav-arrow-prev').show();
-			}
-			return {
-					next: function() {
-
-						if (currentDot >= testArr.length - 1) {
-							currentDot = -1;
-						}
-						currentDot++;
-
-						arrowContent(currentDot);
-					},
-					prev: function() {
-						
-						currentDot--;
-
-						if (currentDot < 0) {
-							currentDot = testArr.length - 1;
-						}
-
-						arrowContent(currentDot);
-					}
-			};
-		})();
-
-			var arrowContent = function(currentDot) {
-            var card2 = testArr[currentDot][5]
-						aLink.show();
-						aTitle.html(testArr[currentDot][5]);
-						aDesc.html(testArr[currentDot][6]);
-						aLink.attr('href', testArr[currentDot][7]);
-						popup.css('background-image', 'url(' + testArr[currentDot][4] + ')');
-						tagFormat.html(testArr[currentDot][9]);
-
-
-						$('.fb').attr('href' , 'https://www.facebook.com/sharer/sharer.php?u=' + testArr[currentDot][7] + '&t=' + testArr[currentDot][5]);
-						$('.twitter').attr('href' , 'https://twitter.com/intent/tweet?text=%23GEWorldInMotion ' + testArr[currentDot][5] + ': ' + testArr[currentDot][7]);
-						$('.linkedin').attr('href', 'http://www.linkedin.com/shareArticle?mini=true&url=' + testArr[currentDot][7] + '&title=%23GEWorldInMotion ' + testArr[currentDot][5]);
-
-
-
-						//testing analytics
-      			$('.nav-arrow-next').attr('data-content-name', aTitle.html());
-      			$('.nav-arrow-prev').attr('data-content-name', aTitle.html());
-						
-						if(testArr[currentDot][9] === 'video') {
-								videoContainer.html("<iframe width='531' height='387' src=" + "'" + testArr[currentDot][7] + "'" + "frameborder='0' allowfullscreen></iframe>");
-								aLink.hide();
-								videoLink.show();
-								videoLink.on('click', function() {
-                  
-									videoContainer.show();
-								});
-
-								$('.x').css('margin-right', '20px');
-						}
-      			else {
-        			videoContainer.empty();
-							videoContainer.hide();
-							videoLink.hide();
-							$('.x').css('margin-right', 0);
-      			}
-						
-				//social
-       if(testArr[currentDot][9] === 'social') {
-					$('.article').hide();
-					popup.css('background-image', 'none').css('width', '354px').css('height', '258px');
-					$('.insta').html("<iframe width='354' height='440' src=" + "'" + testArr[currentDot][7] + "'" + "frameborder='0' allowfullscreen><base target='_blank' /></iframe>");
-					$('.insta').show();
-				}
-				else {
-					$('.article').show();
-					$('.insta').hide();
-					$('.insta').empty();
-					popup.css('width', '531px').css('height', '387px');
-      	}
-						
-				//slideshow
-	 			if(testArr[currentDot][9] === 'slideshow') {
-
-	 			$('.social').hide();
-
-	 			$('.slideshow-url a').attr('href', testArr[currentDot][11]).css('color', aLink.css('background-color'));
-	 			$('.slideshow-url').show();
-				
-				$('.images').css("background-image", 'url("' + testArr[currentDot][7][0] + '")');
-
-
-				slideshowLink.show();
-				aLink.hide();
-				
-				slideshowLink.on('click', function() {
-					slideshowContainer.show();
-				});
-
-
-
-				slideshowStart = (function() {
-
-		     	var images = [],
-		     	curIndex = 0;
-		      
-		      for (var i = 0; i < testArr[currentDot][7].length; i++) {
-		        images.push(testArr[currentDot][7][i]);
-		      }
-		      
-		      var gotoImage = function (index) {
-		          $('.images').each(function (i) {
-		             var image = curIndex + i;
-		              if (image >= images.length) {
-		                  image = image - images.length;
-		              }
-		             $(this).css("background-image", 'url("' + images[image] + '")');
-		          });
-		      };
-
-					return {
-							next: function() {
-		            curIndex++;
-		            if (curIndex === images.length) {
-		                curIndex = 0;
-		            }
-		            gotoImage(curIndex);
-							},
-							prev: function() {
-		            curIndex--;
-		            if (curIndex === -1) {
-		                curIndex = images.length - 1;
-		            }
-		            gotoImage(curIndex);
-							}
-					};
-				})();
-			}
-
-			else {
-				$('.social').show();
-				$('.slideshow-url').hide();
-				slideshowLink.hide();
-				slideshowContainer.hide();
-			}
-					
-				
-						//very quick  fix - for preview only
-						if (testArr[currentDot][2] === 75.3629674) {
-							slideshowContainer.addClass('big-slider');
-						}
-						else {
-							slideshowContainer.removeClass('big-slider');
-						}
-		};
-
-		
-      
-      //video
-      if(cities[activeCity].format === 'video') {
-        videoContainer.html("<iframe width='531' height='387' src=" + "'" + cities[activeCity].link + "'" + "frameborder='0' allowfullscreen></iframe>");
-       	aLink.hide();
-				videoLink.show();
-				videoLink.on('click', function() {
-          
-					videoContainer.show();
-				});
-
-				$('.x').css('margin-right', '20px');
-
-      }
-      else {
-        videoContainer.empty();
-				videoLink.hide();
-				$('.x').css('margin-right', 0);
-      }
-      
-      //social
-       if(cities[activeCity].format === 'social') {
-				$('.article').hide();
-				popup.css('background-image', 'none').css('width', '354px').css('height', '258px');
-        $('.insta').html("<iframe width='354' height='440' src=" + "'" + cities[activeCity].link + "'" + "frameborder='0' allowfullscreen><base target='_blank' /></iframe>");
-        $('.insta').show();
-      }
-      else {
-				$('.insta').hide();
-        $('.insta').empty();
-        popup.css('width', '531px').css('height', '387px');
-      }
-      
-    }
-    mouseDownOn = false;
   }
 
-
-
-
   function onMouseOut(event) {
+    container.removeEventListener('mousemove', onMouseMove, false);
     container.removeEventListener('mouseup', onMouseUp, false);
     container.removeEventListener('mouseout', onMouseOut, false);
-    container.style.cursor = 'auto';
-
-    mouseDownOn = false;
   }
 
   function onMouseWheel(event) {
-  	event.preventDefault();
+    event.preventDefault();
     if (overRenderer) {
       zoom(event.wheelDeltaY * 0.3);
     }
-  	return false;
+    return false;
   }
 
- 
+  function onDocumentKeyDown(event) {
+    switch (event.keyCode) {
+      case 38:
+        zoom(100);
+        event.preventDefault();
+        break;
+      case 40:
+        zoom(-100);
+        event.preventDefault();
+        break;
+    }
+  }
+
+  function onWindowResize( event ) {
+    camera.aspect = container.offsetWidth / container.offsetHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize( container.offsetWidth, container.offsetHeight );
+  }
+
   function zoom(delta) {
     distanceTarget -= delta;
     distanceTarget = distanceTarget > 1000 ? 1000 : distanceTarget;
-    distanceTarget = distanceTarget < 530 ? 530 : distanceTarget;
+    distanceTarget = distanceTarget < 350 ? 350 : distanceTarget;
   }
-	
 
-  function rotate(delta) {
-    target.x -= delta;
+  function animate() {
+    requestAnimationFrame(animate);
+    render();
   }
-	
-	//initial zoom
 
-initZoom = function() {
+  function render() {
+    zoom(curZoomSpeed);
 
-	setTimeout(function() {
-		var tween = new TWEEN.Tween( {value: 1000} )
-			.to({value:780}, 2000)
-			.easing(TWEEN.Easing.Cubic.EaseOut)
-			.onUpdate( function() {
-				distanceTarget = this.value;
-			})
-			.onComplete( function() {
-        if (!GLOBE_ONLY || GE_INTRO) {
-				  container.addEventListener('mousewheel', onMouseWheel, false);
-        }
-				document.addEventListener('keydown', onDocumentKeyDown, false);
-				zoomClick();
-			})
-			.start();
-	}, 1700);
+    rotation.x += (target.x - rotation.x) * 0.1;
+    rotation.y += (target.y - rotation.y) * 0.1;
+    distance += (distanceTarget - distance) * 0.3;
 
-};
+    camera.position.x = distance * Math.sin(rotation.x) * Math.cos(rotation.y);
+    camera.position.y = distance * Math.sin(rotation.y);
+    camera.position.z = distance * Math.cos(rotation.x) * Math.cos(rotation.y);
 
-/**
- * Initialize fade in card once globe is active
- */
-initCard = function() {
+    camera.lookAt(mesh.position);
 
-	setTimeout(function() {
-		
-		var tempArr = [],
-				i=0;
-
-		while (i < dataUS.length) {
-			if (dataUS[i][9] === 'article') {
-				tempArr.push(dataUS[i]);
-			}
-			i++;
-		}
-
-	  var k = Math.floor(Math.random() * tempArr.length);
-				videoLink.hide();
-				slideshowLink.hide();
-				aLink.show();
-				overlay.velocity('fadeIn', { duration: 2000 });
-				popup.velocity('fadeIn', { duration: 2000 });
-				popup.css('background-image', 'url(' + tempArr[k][4] + ')');
-				aTitle.html(tempArr[k][5]);
-				aDesc.html(tempArr[k][6]);
-				aLink.attr('href', tempArr[k][7]);
-				tagTheme.html(tempArr[k][8]);
-				tagFormat.html('article');
-			
-		
-		setTimeout(function() {
-			overlay.velocity('fadeOut', { duration: 1000 });
-			popup.velocity('fadeOut', { duration: 1000 });
-		}, 2000);
-
-	}, 2000);	
-};
-
-function animate() {
-	requestAnimationFrame(animate);
-
-	zoom(curZoomSpeed);
-
-	rotation.x += (target.x - rotation.x) * 0.1;
-	rotation.y += (target.y - rotation.y) * 0.1;
-	distance += (distanceTarget - distance) * 0.3;
-
-
-	camera.position.x = distance * Math.sin(rotation.x) * Math.cos(rotation.y);
-	camera.position.y = distance * Math.sin(rotation.y);
-	camera.position.z = distance * Math.cos(rotation.x) * Math.cos(rotation.y);
-
-	camera.lookAt(sphere.position);
-
-	renderer.render(scene, camera);
-
-	TWEEN.update();
-}
+    renderer.render(scene, camera);
+  }
 
   init();
-  
   this.animate = animate;
+
+
+  this.__defineGetter__('time', function() {
+    return this._time || 0;
+  });
+
+  this.__defineSetter__('time', function(t) {
+    var validMorphs = [];
+    var morphDict = this.points.morphTargetDictionary;
+    for(var k in morphDict) {
+      if(k.indexOf('morphPadding') < 0) {
+        validMorphs.push(morphDict[k]);
+      }
+    }
+    validMorphs.sort();
+    var l = validMorphs.length-1;
+    var scaledt = t*l+1;
+    var index = Math.floor(scaledt);
+    for (i=0;i<validMorphs.length;i++) {
+      this.points.morphTargetInfluences[validMorphs[i]] = 0;
+    }
+    var lastIndex = index - 1;
+    var leftover = scaledt - index;
+    if (lastIndex >= 0) {
+      this.points.morphTargetInfluences[lastIndex] = 1 - leftover;
+    }
+    this.points.morphTargetInfluences[index] = leftover;
+    this._time = t;
+  });
+
   this.addData = addData;
+  this.createPoints = createPoints;
   this.renderer = renderer;
   this.scene = scene;
 
   return this;
+
 };
+
