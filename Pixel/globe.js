@@ -264,7 +264,7 @@ DAT.Globe = function(container, opts) {
     var phi = (90 - lat) * Math.PI / 180;
     var theta = (180 - lng) * Math.PI / 180;
 
-	point3d = new THREE.BoxGeometry(1, 1, 0.5);
+	point3d = new THREE.BoxGeometry(1.5, 1.5, 0);
   	point = new THREE.Mesh(point3d, material);
 	
     point.position.x = 200 * Math.sin(phi) * Math.cos(theta);
