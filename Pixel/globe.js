@@ -152,13 +152,14 @@ DAT.Globe = function(container, opts) {
     container.addEventListener('mousedown', onMouseDown, false);
 
     container.addEventListener('touchstart', function(e){
-    	
+    	mouseDownOn = true;
     	overRenderer = true;
     	onTouchStart(e);
     }, false);
 
     container.addEventListener('touchend', function(e){
     //	overRenderer = false;
+      mouseDownOn = (e.touches.length == 0 ? false: true );
     	onTouchEnd(e);
     }, false);
 
@@ -296,19 +297,24 @@ DAT.Globe = function(container, opts) {
 
   // - Touch events
 
+
   function onTouchStart(event) {
     event.preventDefault();
-
 
     container.addEventListener('touchmove', onTouchMove, false);
     container.addEventListener('touchstart', onTouchStart, false);
     container.addEventListener('touchend', onTouchEnd, false);
-
+    
     mouseOnDown.x = - event.touches[0].clientX;
     mouseOnDown.y = event.touches[0].clientY;
 
     targetOnDown.x = target.x;
     targetOnDown.y = target.y;
+
+    if(event.touches.length == 2){
+      originalDistanceTarget = distanceTarget;
+      originalSep = distanceBetweenEventPoints(event.touches[0],event.touches[1]);
+    }
 
     container.style.cursor = 'move';
   }
@@ -318,13 +324,42 @@ DAT.Globe = function(container, opts) {
     container.removeEventListener('touchstart', onTouchStart, false);
     container.removeEventListener('touchend', onTouchEnd, false);
     container.style.cursor = 'auto';
+
+  }
+
+  var originalDistanceTarget = null;
+  var originalSep = null;
+  var previousDistance = 0;
+
+  function distanceBetweenEventPoints( pnt1, pnt2 ){
+      var x1 = pnt1.clientX;
+      var x2 = pnt2.clientX;
+      var y1 = pnt1.clientY;
+      var y2 = pnt2.clientY;
+      return Math.sqrt(Math.pow((x2 - x1), 2.0) + Math.pow((y2 - y1), 2.0));
   }
 
   function onTouchMove(event) {
-  	
-    mouse.x = - event.touches[0].clientX;
-    mouse.y = event.touches[0].clientY;
+  	 //multitouch
+    if(event.touches.length > 1){
+      
+      var sep = distanceBetweenEventPoints(event.touches[0],event.touches[1]);
+     
+      //check if pinch out or pinch in
+      //zooming out
+      var ratio = sep / originalSep;
+      console.log( ratio );
+      
+      setDistanceTarget( originalDistanceTarget * 1 / ratio );
 
+      mouse.x = - 0.5 * (event.touches[0].clientX + event.touches[1].clientX);
+      mouse.y = 0.5 * ( event.touches[0].clientY + event.touches[1].clientY );
+
+    }else{
+      mouse.x = - event.touches[0].clientX;
+      mouse.y = event.touches[0].clientY;
+    }
+    
     var zoomDamp = distance/1000;
 
     target.x = targetOnDown.x + (mouse.x - mouseOnDown.x) * 0.005 * zoomDamp;
@@ -408,9 +443,11 @@ DAT.Globe = function(container, opts) {
   }
 
   function zoom(delta) {
-    distanceTarget -= delta;
-    distanceTarget = distanceTarget > 1000 ? 1000 : distanceTarget;
-    distanceTarget = distanceTarget < 350 ? 350 : distanceTarget;
+    setDistanceTarget( distanceTarget - delta );
+  }
+
+  function setDistanceTarget( value ){
+    distanceTarget = Math.max( 350, Math.min( 1000, value ));
   }
 
   function animate() {
@@ -421,8 +458,8 @@ DAT.Globe = function(container, opts) {
   function render() {
     zoom(curZoomSpeed);
 
-    rotation.x += (target.x - rotation.x) * 0.1;
-    rotation.y += (target.y - rotation.y) * 0.1;
+    rotation.x += (target.x - rotation.x) * 0.1;//(mouseDownOn ? 0.1 : 0.01);
+    rotation.y += (target.y - rotation.y) * 0.1;//(mouseDownOn ? 0.1 : 0.01);
     distance += (distanceTarget - distance) * 0.3;
 
     camera.position.x = distance * Math.sin(rotation.x) * Math.cos(rotation.y);
@@ -430,7 +467,7 @@ DAT.Globe = function(container, opts) {
     camera.position.z = distance * Math.cos(rotation.x) * Math.cos(rotation.y);
 
     camera.lookAt(mesh.position);
-
+  
     renderer.render(scene, camera);
   }
 
