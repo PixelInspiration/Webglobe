@@ -158,7 +158,7 @@ DAT.Globe = function(container, opts) {
     }, false);
 
     container.addEventListener('touchend', function(e){
-    	overRenderer = false;
+    //	overRenderer = false;
     	onTouchEnd(e);
     }, false);
 
