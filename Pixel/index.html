@@ -90,6 +90,68 @@
       background-size: 100%;
     }
 
+    #overlay{
+      width: 100%;
+      height: 100%;
+      background-color: #000000;
+      opacity: 0.6;
+      z-index: 10;
+      position: absolute;
+      left: 0;
+      top: 0;
+      display: none;
+    }
+
+    #popup{
+      width: 667px;
+      top: 50%;
+      left: 50%;
+      height: 550px;
+      margin-left: -333px;
+      margin-top: -225px;
+      z-index: 11;
+      background-color: #ffffff;
+      display: none;
+      position: absolute;;
+    }
+
+    #popup .content{
+      padding: 10px;
+    }
+    #popup h1{
+      font-weight: normal;
+      color: #DB030C;
+      margin-top: 0;
+    }
+
+    #popup h2{
+      font-weight: normal;
+      color: #DB030C;
+      margin-top: 0;
+    
+    }
+
+    #popup p{
+      color: #777777;
+    }
+
+    #popup .call{
+      font-size: 40px;
+      font-weight: bold;
+      color: #DB030C;
+      float: right;
+      margin: 10px;
+    }
+    #popup .close{
+      background-image:url(close-icon.png);
+      background-size: 100%;
+      width: 50px;
+      height: 50px;
+      position: absolute;
+      top: -25px;
+      right: -25px;
+      z-index: 12;
+    }
 
   </style>
 </head>
@@ -97,7 +159,19 @@
 
 <div id="container" touch-action="pan-x pan-y"></div>
 
+<div id="overlay"></div>
+<div id="popup">
+  <a href="#" class="close"></a>
+  <img src="http://www.flightcentre.co.uk/cms_images/promotions/2015-campaigns/05-may/escape/banner-indian.jpg" />
+  <div class="content">
+    <h1>Indian Ocean - Dubai Escapes</h1>
+    <h2>From &pound;755</h2>
+    <p>The vast Indian Ocean is home to some of the world’s most exotic and iconic islands, where paradise is characterised by tranquil azure lagoons, soft white sands, gently swaying palms and endless sapphire-blue skies. The low-lying islands of the Maldives are renowned for their wonderfully romantic stilted over-water villas and world-class diving, while Mauritius boasts centuries of diverse heritage, fascinating culture and a wealth of varying landscapes, from palm-fringed beaches to forest-covered mountains.</p>
 
+    <a href="#" class="call">800 587 0058</a>
+  </div>
+
+</div>
 
 <div id="title">
   
@@ -111,8 +185,8 @@
 <script type="text/javascript" src="/globe/third-party/Detector.js"></script>
 <script type="text/javascript" src="/globe/third-party/three.min.js"></script>
 <script type="text/javascript" src="/globe/third-party/tween.js"></script>
-<script type="text/javascript" src="/polymer-globe/polymer/polymer-all/PointerEvents/src/pointerevent.js"></script>
 <script type="text/javascript" src="globe.js"></script>
+<script type="text/javascript" src="js/jquery-2.1.4.min.js"></script>
 <script type="text/javascript">
 
   var globe = DAT.Globe(document.getElementById('container'), {

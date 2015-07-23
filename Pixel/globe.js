@@ -497,7 +497,8 @@ DAT.Globe = function(container, opts) {
   	    clearActiveCity();
   	    if(city > -1){
   	    	setActiveCity(city);
-  	    	alert(cities[city].title);
+  	    	//alert(cities[city].title);
+  	    	$('#popup, #overlay').fadeIn();
   	    }
   	    
   	  }
@@ -505,6 +506,9 @@ DAT.Globe = function(container, opts) {
 
   }
 
+ 	$('#popup .close').on('touchend', function(){
+ 		$('#popup, #overlay').hide();
+ 	})
 
   // - Mouse events
 
