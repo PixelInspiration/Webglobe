@@ -373,8 +373,12 @@ DAT.Globe = function(container, opts) {
     target.x = targetOnDown.x + (mouse.x - mouseOnDown.x) * 0.005 * zoomDamp;
     target.y = targetOnDown.y + (mouse.y - mouseOnDown.y) * 0.005 * zoomDamp;
 
+    /*
     target.y = target.y > PI_HALF ? PI_HALF : target.y;
     target.y = target.y < - PI_HALF ? - PI_HALF : target.y;
+    */
+
+    target.y = Math.max( -PI_HALF, Math.min( PI_HALF, target.y ) );
   }
 
   // - Mouse events
@@ -482,6 +486,10 @@ DAT.Globe = function(container, opts) {
       rotationSpeed.x *= momentum;
       rotationSpeed.y *= momentum;
     }
+
+    //limit the rotation at the poles
+    var limitRotationY = 0.75 * PI_HALF;
+    rotation.y = Math.max( - limitRotationY, Math.min( limitRotationY, rotation.y ) );
     
     distance += (distanceTarget - distance) * 0.3;
 
@@ -492,6 +500,7 @@ DAT.Globe = function(container, opts) {
     camera.lookAt(mesh.position);
   
     renderer.render(scene, camera);
+    //keep track of the rotation
     rotationPrev.x = rotation.x;
     rotationPrev.y = rotation.y;
   }
