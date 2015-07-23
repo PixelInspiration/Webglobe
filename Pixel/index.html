@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <title>WebGL Globe</title>
+  <title>The Airfare Experts</title>
+  <link type="text/css" rel="stylesheet" href="//fonts.googleapis.com/css?family=Cabin:400,500,600,700" media="all" />
   <meta charset="utf-8">
   <style type="text/css">
     html {
@@ -13,7 +14,7 @@
       padding: 0;
       background: #000000 url(/globe/loading.gif) center center no-repeat;
       color: #ffffff;
-      font-family: sans-serif;
+      font-family: "Gill Sans","Cabin",Arial,Helvetica,sans-serif;
       font-size: 13px;
       line-height: 20px;
       height: 100%;
@@ -46,13 +47,13 @@
     }
 
     #title {
+
       position: absolute;
       top: 20px;
-      width: 320px;
+      width: 594px;
+      height: 88px;
       left: 20px;
-      background-color: rgba(0, 0, 0, 0.2);
-      font: 20px/20px Georgia;
-      padding: 15px;
+      background: url(http://www.flightcentre.co.uk/sites/flightcentre.co.uk/themes/custom/fcuk/logo.png);
     }
 
     .year {
@@ -85,7 +86,8 @@
       position: absolute;
       bottom: 15px;
       left: 20px;
-      background: url(/globe/ce.png);
+      background: url(http://www.pixelinspiration.co.uk/wp-content/uploads/2013/05/new-pixel-logo1.jpg);
+      background-size: 100%;
     }
 
 
@@ -95,19 +97,14 @@
 
 <div id="container" touch-action="pan-x pan-y"></div>
 
-<div id="info">
-  The <a href="http://www.chromeexperiments.com/globe">WebGL Globe</a> is an
-  open platform for visualizing geographic data. <span
-    class="bull">&bull;</span> <a href="https://github.com/dataarts/webgl-globe">Get
-  the code</a> <span class="bull">&bull;</span> By the Google Data Arts Team</a>
-</div>
+
 
 <div id="title">
-  Google Search Volume by Language
+  
 </div>
 
-<a id="ce" href="http://www.chromeexperiments.com/globe">
-  <span>This is a Chrome Experiment</span>
+<a id="ce" href="#">
+  <span>Pixel Inspiration</span>
 </a>
 
 
@@ -119,12 +116,8 @@
 
   var globe = DAT.Globe(document.getElementById('container'), {
     colorFn: function(label) {
-       return new THREE.Color([
-         0xd9d9d9, 0xb6b4b5, 0x9966cc, 0x15adff, 0x3e66a3,
-         0x216288, 0xff7e7e, 0xff1f13, 0xc0120b, 0x5a1301, 0xffcc02,
-         0xedb113, 0x9fce66, 0x0c9a39,
-         0xfe9872, 0x7f3f98, 0xf26522, 0x2bb673, 0xd7df23,
-         0xe6b23a, 0x7ed3f7][label]);
+       //return new THREE.Color(0xEE0000);
+       return new THREE.Color(0xffffff);
     }
   });
 
