@@ -58,7 +58,7 @@ DAT.Globe = function(container, opts) {
   };
 
   var camera, scene, renderer, w, h;
-  var mesh, atmosphere, point;
+  var sphere, atmosphere, point, projector;
 
   var overRenderer;
 
@@ -68,7 +68,9 @@ DAT.Globe = function(container, opts) {
    var pointMesh = [],
     stopaMesh = [],
     dotMesh = [], 
-  	dotData = [];
+  	dotData = [],  	
+  	cities = [],
+  	activeCity = -1;
   
   var mouse = { x: 0, y: 0 }, mouseOnDown = { x: 0, y: 0 };
   
@@ -112,10 +114,10 @@ DAT.Globe = function(container, opts) {
 
         });
 
-    mesh = new THREE.Mesh(geometry, material);
-    mesh.rotation.y = Math.PI;
+    sphere = new THREE.Mesh(geometry, material);
+    sphere.rotation.y = Math.PI;
     
-	scene.add(mesh);
+	scene.add(sphere);
 	
 
     shader = Shaders['atmosphere'];
@@ -141,6 +143,8 @@ DAT.Globe = function(container, opts) {
     geometry.applyMatrix(new THREE.Matrix4().makeTranslation(0,0,-0.5));
 
     point = new THREE.Mesh(geometry);
+
+    projector = new THREE.Projector();
 
     renderer = new THREE.WebGLRenderer({antialias: true});
     renderer.setSize(w, h);
@@ -200,14 +204,23 @@ DAT.Globe = function(container, opts) {
 			 size = 50;
 			 step = 4;
 			 color = colorFnWrapper(data[i], 0);
-			 addPoint(lat, lng, size, color, subgeo);
+			 addCity(lat, lng, size, color, subgeo);
+
+			 color.setStyle('#f7c438');
 			 
-		
+			pointMesh.push(point);
+			stopaMesh.push(stopa);
+
+			//meshes holding both line and bottom circle (stopa) for animating lines
+			dotMesh.push(point, stopa);
+			dotData.push(point.scale.z, stopa.scale.z);
+
 			
 			scene.add(point);
 			scene.add(stopa);
 			
 		}
+
 		this._baseGeometry = subgeo;
   };
 
@@ -241,7 +254,7 @@ DAT.Globe = function(container, opts) {
     }
   }
 
-  function addPoint(lat, lng, size, color, subgeo) {
+  function addCity(lat, lng, size, color, subgeo) {
 
    var material = new THREE.MeshBasicMaterial({
       color: 0xffffff,
@@ -258,7 +271,7 @@ DAT.Globe = function(container, opts) {
     point.position.y = 200 * Math.cos(phi);
     point.position.z = 200 * Math.sin(phi) * Math.sin(theta);
 
-    point.lookAt(mesh.position);
+    point.lookAt(sphere.position);
 
     point.scale.z = Math.max( size, 0.1 ); // avoid non-invertible matrix
     // point.updateMatrix();
@@ -285,18 +298,69 @@ DAT.Globe = function(container, opts) {
     //rotate the cylinder
     stopalo.applyMatrix(new THREE.Matrix4().makeRotationX(Math.PI / 2));
   
-    stopa.lookAt(mesh.position);
+    stopa.lookAt(sphere.position);
     
 
     for (i = 0; i < stopa.geometry.faces.length; i++) {
       stopa.geometry.faces[i].color = color;
     }
+
+    cities.push({'position': point.position.clone(), 'img': null, 'color' : color, 'size' : size, 'lat' : lat, 'lng' : lng, 'title' : 'Your destination ' + cities.length, 'desc' : 'Beautiful city', 'link': 'http://www.flightcentre.co.uk'});
+     
 	// scene.add(stopa);
 	// scene.add(this.point);
   }
 
+
+  function objectPick(event) {
+  	
+      var vector = new THREE.Vector3((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1, 0.5);
+
+      //var vector = new THREE.Vector3((mouseOnDown.x / window.innerWidth) * 2 - 1, - (mouseOnDown.y / window.innerHeight) * 2 + 1, 0.5);
+  
+     projector.unprojectVector(vector, camera);
+      var raycaster = new THREE.Raycaster(camera.position, vector.sub(camera.position).normalize());
+
+      var intersects = raycaster.intersectObject(sphere);
+      console.log(intersects);
+      if (intersects.length > 0) {
+        return intersects[0].point;
+      }
+
+      return null;
+    }
+
+
+  function findClosestCity(point) {
+      point.sub(sphere.position).normalize();
+
+      var city;
+      var index = -1, best, dist;
+
+      for (var i = 0; i < cities.length; i++) {
+        city = cities[i].position.clone();
+        city.sub(sphere.position).normalize();
+        dist = city.dot(point);
+  			
+        if (index === -1 || dist > best) {
+          index = i;
+          best = dist;
+  				
+        }
+      }
+
+      if (index === -1 || best < 0.9998) {
+        return -1;
+      }
+  		
+      return index;
+    }
+
+
+
   // - Touch events
 
+  var lastTouchedEvent = null;
 
   function onTouchStart(event) {
     event.preventDefault();
@@ -314,7 +378,7 @@ DAT.Globe = function(container, opts) {
 
     mouseOnDown.x = - event.touches[0].clientX;
     mouseOnDown.y = event.touches[0].clientY;
-
+    lastTouchedEvent = event;
     targetOnDown.x = target.x;
     targetOnDown.y = target.y;
 
@@ -333,7 +397,28 @@ DAT.Globe = function(container, opts) {
     container.removeEventListener('touchend', onTouchEnd, false);
     container.style.cursor = 'auto';
 
+    checkCityNearby(lastTouchedEvent.touches[0]);
+    
   }
+
+  function setActiveCity(newCity) {
+      activeCity = newCity;
+      if (newCity !== -1) {
+        var tween = new TWEEN.Tween( {scalePoint: 1, scaleText: 0} )
+          .to({scalePoint: 2, scaleText: 1}, 200)
+          .easing(TWEEN.Easing.Cubic.EaseIn)
+          .onUpdate( function() {
+            pointMesh[newCity].scale.x = this.scalePoint;
+            pointMesh[newCity].scale.y = this.scalePoint;
+            pointMesh[newCity].updateMatrix();
+          })
+          .start();
+    
+        
+      }
+    }
+
+
 
   var originalDistanceTarget = null;
   var originalSep = null;
@@ -381,6 +466,46 @@ DAT.Globe = function(container, opts) {
     target.y = Math.max( -PI_HALF, Math.min( PI_HALF, target.y ) );
   }
 
+  //city selected
+  function clearActiveCity() {
+      if (activeCity !== -1) {
+        var saved = activeCity;
+        var tween = new TWEEN.Tween( {scalePoint: 2, scaleText: 1} )
+          .to({scalePoint: 1, scaleText: 0}, 200)
+          .easing(TWEEN.Easing.Cubic.EaseOut)
+          .onUpdate( function() {
+            pointMesh[saved].scale.x = this.scalePoint;
+            pointMesh[saved].scale.y = this.scalePoint;
+            pointMesh[saved].updateMatrix();
+          })
+          .onComplete( function() {
+          })
+          .start();
+            container.style.cursor = 'auto';
+
+      }
+      activeCity = -1;
+    }
+
+  function checkCityNearby(event){
+  	var intersectPoint = objectPick(event);
+  	if (intersectPoint !== null) {
+  	  var city = findClosestCity(intersectPoint);
+  	 
+  	  if (city !== activeCity) {
+  	    container.style.cursor = 'pointer';
+  	    clearActiveCity();
+  	    if(city > -1){
+  	    	setActiveCity(city);
+  	    	alert(cities[city].title);
+  	    }
+  	    
+  	  }
+  	}
+
+  }
+
+
   // - Mouse events
 
   function onMouseDown(event) {
@@ -419,6 +544,8 @@ DAT.Globe = function(container, opts) {
     container.removeEventListener('mouseup', onMouseUp, false);
     container.removeEventListener('mouseout', onMouseOut, false);
     container.style.cursor = 'auto';
+   checkCityNearby(event);
+
   }
 
   function onMouseOut(event) {
@@ -497,7 +624,7 @@ DAT.Globe = function(container, opts) {
     camera.position.y = distance * Math.sin(rotation.y);
     camera.position.z = distance * Math.cos(rotation.x) * Math.cos(rotation.y);
 
-    camera.lookAt(mesh.position);
+    camera.lookAt(sphere.position);
   
     renderer.render(scene, camera);
     //keep track of the rotation
