@@ -305,11 +305,19 @@ DAT.Globe = function(container, opts) {
     container.addEventListener('touchstart', onTouchStart, false);
     container.addEventListener('touchend', onTouchEnd, false);
     
+    if( event.touches.length == 1 ){
+      //reset target to match current rotation
+      target.x = rotation.x;  
+      target.y = rotation.y;
+    }
+
+
     mouseOnDown.x = - event.touches[0].clientX;
     mouseOnDown.y = event.touches[0].clientY;
 
     targetOnDown.x = target.x;
     targetOnDown.y = target.y;
+
 
     if(event.touches.length == 2){
       originalDistanceTarget = distanceTarget;
@@ -455,11 +463,26 @@ DAT.Globe = function(container, opts) {
     render();
   }
 
+  var momentum = 0.99, momentumBoost = 1.5;
+  var rotationPrev = {x:0,y:0};
+  var rotationSpeed = {x:0,y:0};
   function render() {
     zoom(curZoomSpeed);
 
-    rotation.x += (target.x - rotation.x) * 0.1;//(mouseDownOn ? 0.1 : 0.01);
-    rotation.y += (target.y - rotation.y) * 0.1;//(mouseDownOn ? 0.1 : 0.01);
+    if( mouseDownOn ){
+      rotation.x += (target.x - rotation.x) * 0.1;
+      rotation.y += (target.y - rotation.y) * 0.1;
+
+      rotationSpeed.x = rotation.x - rotationPrev.x;
+      rotationSpeed.y = rotation.y - rotationPrev.y;
+    }else{
+      rotation.x += momentumBoost * rotationSpeed.x;
+      rotation.y += momentumBoost * rotationSpeed.y;
+
+      rotationSpeed.x *= momentum;
+      rotationSpeed.y *= momentum;
+    }
+    
     distance += (distanceTarget - distance) * 0.3;
 
     camera.position.x = distance * Math.sin(rotation.x) * Math.cos(rotation.y);
@@ -469,6 +492,8 @@ DAT.Globe = function(container, opts) {
     camera.lookAt(mesh.position);
   
     renderer.render(scene, camera);
+    rotationPrev.x = rotation.x;
+    rotationPrev.y = rotation.y;
   }
 
   init();
