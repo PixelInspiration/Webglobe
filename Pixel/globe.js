@@ -208,7 +208,7 @@ DAT.Globe = function(container, opts) {
   
   
   function addData(data, opts) {
-		var lat, lng, size, color, img, i, colorFnWrapper, slideshowURL;
+		var lat, lng, size, color, img, i, colorFnWrapper, slideshowURL, title,  price, description;
 		
 		opts.animated = opts.animated || false;
 		this.is_animated = opts.animated;
@@ -221,10 +221,13 @@ DAT.Globe = function(container, opts) {
 			
 			 lat = data[i][0];
 			 lng = data[i][1];
+       title = data[i][2]; 
+       price = data[i][3];
+       description = data[i][4];
 			 size = 50;
 			 step = 4;
 			 color = colorFnWrapper(data[i], 0);
-			 addCity(lat, lng, size, color, subgeo);
+			 addCity(lat, lng, size, color, subgeo, title,  price, description);
 			 
 			pointMesh.push(point);
 			stopaMesh.push(stopa);
@@ -272,7 +275,7 @@ DAT.Globe = function(container, opts) {
     }
   }
 
-  function addCity(lat, lng, size, color, subgeo) {
+  function addCity(lat, lng, size, color, subgeo, title,  price, description) {
 
    var material = new THREE.MeshBasicMaterial({
       color: 0xffffff,
@@ -323,7 +326,7 @@ DAT.Globe = function(container, opts) {
       stopa.geometry.faces[i].color = color;
     }
 
-    cities.push({'position': point.position.clone(), 'img': null, 'color' : color, 'size' : size, 'lat' : lat, 'lng' : lng, 'title' : 'Your destination ' + cities.length, 'desc' : 'Beautiful city', 'link': 'http://www.flightcentre.co.uk'});
+    cities.push({'position': point.position.clone(), 'img': null, 'color' : color, 'size' : size, 'lat' : lat, 'lng' : lng, 'title' : title, 'desc' : description, 'price':price, 'link': 'http://www.flightcentre.co.uk'});
      
 	// scene.add(stopa);
 	// scene.add(this.point);
@@ -516,6 +519,10 @@ DAT.Globe = function(container, opts) {
   	    if(city > -1){
   	    	setActiveCity(city);
   	    	//alert(cities[city].title);
+          console.log(cities[city])
+          $('#popup .title').html(cities[city].title);
+          $('#popup .price').html(cities[city].price);
+          $('#popup .description').html(cities[city].description);
   	    	$('#popup, #overlay').fadeIn();
   	    }
   	    
