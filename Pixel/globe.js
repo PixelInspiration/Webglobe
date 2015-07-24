@@ -59,6 +59,7 @@ DAT.Globe = function(container, opts) {
 
   var camera, scene, renderer, w, h;
   var sphere, atmosphere, point, projector;
+  var globeManipulator;
 
   var overRenderer;
 
@@ -153,7 +154,10 @@ DAT.Globe = function(container, opts) {
 
     container.appendChild(renderer.domElement);
 
-    container.addEventListener('mousedown', onMouseDown, false);
+    container.addEventListener('mousedown', function(e){
+      mouseDownOn = true;
+      onMouseDown(e);
+    }, false);
 
     container.addEventListener('touchstart', function(e){
     	mouseDownOn = true;
@@ -166,6 +170,22 @@ DAT.Globe = function(container, opts) {
       mouseDownOn = (e.touches.length == 0 ? false: true );
     	onTouchEnd(e);
     }, false);
+
+    // globeManipulator = new globe_manipulator({
+    //     dom_object: renderer.domElement,
+    //     camera: camera,
+    //     radius: 100.0,
+    //     auto_rotate: false,
+    //     on_clicked_callback: null,
+    //     right_click_to_select: true,
+    //     start_lat: 37.520925,
+    //     start_lng: -122.309460,
+    //     start_distance: 300,
+    //     min_distance: 120.0,
+    //     max_distance: 450.0,
+    //     mesh: sphere
+    // });
+
 
     container.addEventListener('mousewheel', onMouseWheel, false);
 
@@ -504,9 +524,31 @@ DAT.Globe = function(container, opts) {
 
   }
 
- 	$('#popup .close').on('touchend', function(){
+ 	$('#popup .close').on('touchend, click', function(){
  		$('#popup, #overlay').hide();
  	})
+
+  
+
+  function set_lat_lng(lat, lng) {
+
+      target.x = (lng - 90) * Math.PI / 180.0;
+      target.y = lat * Math.PI / 180.0;
+      mouseDownOn =true;
+     
+  }
+
+  $('#destinations a').on('touchend, click', function(e){
+    zoom(-1000);
+    var lat = $(this).attr('data-lat'),
+        lng = $(this).attr('data-lng');
+
+    set_lat_lng(lat, lng);
+    var zoomInterval = setInterval(zoom(200), 2000);
+
+    
+
+  });
 
   // - Mouse events
 
@@ -539,6 +581,7 @@ DAT.Globe = function(container, opts) {
 
     target.y = target.y > PI_HALF ? PI_HALF : target.y;
     target.y = target.y < - PI_HALF ? - PI_HALF : target.y;
+
   }
 
   function onMouseUp(event) {
@@ -601,7 +644,7 @@ DAT.Globe = function(container, opts) {
   var rotationSpeed = {x:0,y:0};
   function render() {
     zoom(curZoomSpeed);
-
+  
     if( mouseDownOn ){
       rotation.x += (target.x - rotation.x) * 0.1;
       rotation.y += (target.y - rotation.y) * 0.1;
