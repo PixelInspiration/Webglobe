@@ -205,8 +205,6 @@ DAT.Globe = function(container, opts) {
 			 step = 4;
 			 color = colorFnWrapper(data[i], 0);
 			 addCity(lat, lng, size, color, subgeo);
-
-			 color.setStyle('#f7c438');
 			 
 			pointMesh.push(point);
 			stopaMesh.push(stopa);
@@ -264,7 +262,7 @@ DAT.Globe = function(container, opts) {
     var phi = (90 - lat) * Math.PI / 180;
     var theta = (180 - lng) * Math.PI / 180;
 
-	point3d = new THREE.BoxGeometry(1.5, 1.5, 0);
+	point3d = new THREE.BoxGeometry(1.5, 1.5, 0.3);
   	point = new THREE.Mesh(point3d, material);
 	
     point.position.x = 200 * Math.sin(phi) * Math.cos(theta);
