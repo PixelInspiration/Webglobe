@@ -69,6 +69,7 @@ DAT.Globe = function(container, opts) {
    var pointMesh = [],
     stopaMesh = [],
     dotMesh = [], 
+    flagMesh = [], 
   	dotData = [],  	
   	cities = [],
   	activeCity = -1;
@@ -231,12 +232,13 @@ DAT.Globe = function(container, opts) {
 			 
 			pointMesh.push(point);
 			stopaMesh.push(stopa);
+      flagMesh.push(flag);
 
 			//meshes holding both line and bottom circle (stopa) for animating lines
-			dotMesh.push(point, stopa);
-			dotData.push(point.scale.z, stopa.scale.z);
+			dotMesh.push(point, stopa, flag);
+			dotData.push(point.scale.z, stopa.scale.z, flag.scale.z);
 
-			
+			scene.add(flag);
 			scene.add(point);
 			scene.add(stopa);
 			
@@ -285,7 +287,7 @@ DAT.Globe = function(container, opts) {
     var phi = (90 - lat) * Math.PI / 180;
     var theta = (180 - lng) * Math.PI / 180;
 
-	point3d = new THREE.BoxGeometry(1.5, 1.5, 0.3);
+	 point3d = new THREE.BoxGeometry(1.5, 1.5, 0.4);
   	point = new THREE.Mesh(point3d, material);
 	
     point.position.x = 200 * Math.sin(phi) * Math.cos(theta);
@@ -295,7 +297,7 @@ DAT.Globe = function(container, opts) {
     point.lookAt(sphere.position);
 
     point.scale.z = Math.max( size, 0.1 ); // avoid non-invertible matrix
-    // point.updateMatrix();
+    point.updateMatrix();
 
     for (var i = 0; i < point.geometry.faces.length; i++) {
 
@@ -324,6 +326,40 @@ DAT.Globe = function(container, opts) {
 
     for (i = 0; i < stopa.geometry.faces.length; i++) {
       stopa.geometry.faces[i].color = color;
+    }
+
+
+      //Flag
+   // var flago = new THREE.CylinderGeometry(5, 2, 2, 14, 0, false);
+    var flago = new THREE.Geometry();
+    var v1 = new THREE.Vector3(5,5,5);
+    var v2 = new THREE.Vector3(0,5,0);
+    var v3 = new THREE.Vector3(0,0,0);
+
+    flago.vertices.push(v1);
+    flago.vertices.push(v2);
+    flago.vertices.push(v3);
+
+    flago.faces.push(new THREE.Face3(0,1,2));
+
+
+
+    flag = new THREE.Mesh(flago, material);
+
+    flag.position.x = 210 * Math.sin(phi) * Math.cos(theta);
+    flag.position.y = 210 * Math.cos(phi);
+    flag.position.z = 210 * Math.sin(phi) * Math.sin(theta);    
+    
+    //rotate the cylinder
+    flago.applyMatrix(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+  
+    flag.lookAt(sphere.position);
+    
+
+    for (i = 0; i < flag.geometry.faces.length; i++) {
+      //color.setStyle('#f7c438');
+      
+      flag.geometry.faces[i].color.setStyle('#f7c438');
     }
 
     cities.push({'position': point.position.clone(), 'img': null, 'color' : color, 'size' : size, 'lat' : lat, 'lng' : lng, 'title' : title, 'desc' : description, 'price':price, 'link': 'http://www.flightcentre.co.uk'});
