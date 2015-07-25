@@ -559,7 +559,35 @@ DAT.Globe = function(container, opts) {
           $('#popup .title').html(cities[city].title);
           $('#popup .price').html(cities[city].price);
           $('#popup .description').html(cities[city].description);
-  	    	$('#popup, #overlay').fadeIn();
+  	      
+		  //calculate the path
+		  var $overlay = $('#overlay');
+		  var $popup = $('#popup');
+		  var xStart = event.clientX, yStart = event.clientY;
+		  var xEnd = 0.5 * $overlay.width(), yEnd = 0.5 * $overlay.height();
+		  var xMid = xStart + ( xStart > xEnd ? 1 : -1 ) * 250, yMid = yStart + ( yStart > yEnd ? 1 : -1 ) * 250;
+		  //define the path
+		  var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+		  $( path ).attr( "d", [
+			"M" + xStart + " " + yStart,
+			"Q" + xMid + " " + yMid,
+			"" + xEnd + " " + yEnd
+		  ].join(" ") );
+		
+		  //start the pop up at the beginning
+		  $overlay.fadeIn();
+		  $popup.css({left:xStart, top:yStart }).show().animate({state:1},{
+			  progress : function( target, progress, time ){
+				  var pnt = path.getPointAtLength( path.getTotalLength() * progress );
+				  var scale = 0.2 + 0.8 * progress;
+				  var transform = "scale("+scale+","+scale+")";
+				  $popup.css({left:pnt.x, top:pnt.y, "transform" : transform, opacity: progress });
+			  },
+			  complete : function(){
+				  $( path ).remove();
+			  },
+			  duration : 1000
+		  });
   	    }
   	    
   	  }
@@ -567,9 +595,9 @@ DAT.Globe = function(container, opts) {
 
   }
 
- 	$('#popup .close').on('touchend, click', function(){
+ 	$('#popup .close, #overlay').on('touchend, click', function(){
  		$('#popup, #overlay').hide();
- 	})
+ 	});
 
   
 
