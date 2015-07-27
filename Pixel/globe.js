@@ -794,10 +794,9 @@ DAT.Globe = function(container, opts) {
   
   	//try to save the processor from repeated rendering
   	if( mouseDownOn || distanceBetweenPoints( rotation, rotationPrev ) > 0.0001 ){
-	    
 		renderer.render(scene, camera);
 		rendererOverlay.render(sceneOverlay, camera);
-    
+
 		var angleLimit = 0.25;
 		flagMesh.forEach( function( flag ){
 			flag.lookAt( camera.position );//{x:flag.position.x,y:flag.position.y + 200,z:flag.position.z});
