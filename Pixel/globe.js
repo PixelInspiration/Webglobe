@@ -85,7 +85,7 @@ DAT.Globe = function(container, opts) {
     }
   };
 
-  var camera, scene, renderer, w, h;
+  var camera, scene, sceneOverlay, renderer, rendererOverlay, w, h;
   var sphere, atmosphere, point, projector;
   var globeManipulator;
 
@@ -128,6 +128,7 @@ DAT.Globe = function(container, opts) {
     camera.position.z = distance;
 
     scene = new THREE.Scene();
+	sceneOverlay = new THREE.Scene();
 
     var geometry = new THREE.SphereGeometry(200, 40, 30);
 
@@ -137,12 +138,10 @@ DAT.Globe = function(container, opts) {
     uniforms['texture'].value = THREE.ImageUtils.loadTexture(imgDir+'world.jpg');
 
     material = new THREE.ShaderMaterial({
-
           uniforms: uniforms,
           vertexShader: shader.vertexShader,
           fragmentShader: shader.fragmentShader
-
-        });
+    });
 
     sphere = new THREE.Mesh(geometry, material);
     sphere.rotation.y = Math.PI;
@@ -163,6 +162,12 @@ DAT.Globe = function(container, opts) {
           transparent: true
 
         });
+		
+	var textureFlag = THREE.ImageUtils.loadTexture('marker-icon.png');
+	materialFlag = new THREE.MeshBasicMaterial({
+		map: textureFlag,
+        transparent: true
+	});
 
     atmosphereMesh = new THREE.Mesh(geometry, material);
     atmosphereMesh.scale.set( 1.1, 1.1, 1.1 );
@@ -178,11 +183,15 @@ DAT.Globe = function(container, opts) {
 
     renderer = new THREE.WebGLRenderer({antialias: true});
     renderer.setSize(w, h);
+	renderer.domElement.style.position = 'absolute';
+	container.appendChild(renderer.domElement);
 
-    renderer.domElement.style.position = 'absolute';
-
-    container.appendChild(renderer.domElement);
-
+	rendererOverlay = new THREE.WebGLRenderer({antialias: true, alpha: true });
+	rendererOverlay.setSize(w, h);
+	rendererOverlay.domElement.style.position = 'absolute';
+	//rendererOverlay.setClearColorHex( 0x00ff0000, 0 );
+	container.appendChild(rendererOverlay.domElement);
+	
     container.addEventListener('mousedown', function(e){
       mouseDownOn = true;
       onMouseDown(e);
@@ -266,7 +275,7 @@ DAT.Globe = function(container, opts) {
 			dotMesh.push(point, stopa, flag);
 			dotData.push(point.scale.z, stopa.scale.z, flag.scale.z);
 
-			scene.add(flag);
+			sceneOverlay.add(flag);
 			scene.add(point);
 			scene.add(stopa);
 			
@@ -315,7 +324,7 @@ DAT.Globe = function(container, opts) {
     var phi = (90 - lat) * Math.PI / 180;
     var theta = (180 - lng) * Math.PI / 180;
 
-	 point3d = new THREE.BoxGeometry(1.5, 1.5, 0.4);
+	 point3d = new THREE.BoxGeometry(1.5, 1.5, 0.04);
   	point = new THREE.Mesh(point3d, material);
 	
     point.position.x = 200 * Math.sin(phi) * Math.cos(theta);
@@ -359,7 +368,7 @@ DAT.Globe = function(container, opts) {
 
       //Flag
    // var flago = new THREE.CylinderGeometry(5, 2, 2, 14, 0, false);
-    var flago = new THREE.Geometry();
+    /*var flago = new THREE.Geometry();
     var v1 = new THREE.Vector3(5,5,5);
     var v2 = new THREE.Vector3(0,5,0);
     var v3 = new THREE.Vector3(0,0,0);
@@ -390,6 +399,17 @@ DAT.Globe = function(container, opts) {
       flag.geometry.faces[i].color.setStyle('#f7c438');
     }
 
+	*/
+	
+	var flagScale = 0.5;
+	flag = new THREE.Mesh( new THREE.PlaneGeometry( flagScale * 20, flagScale * 63 ), materialFlag );
+    flag.position.x = 200 * Math.sin(phi) * Math.cos(theta);
+    flag.position.y = 200 * Math.cos(phi);
+    flag.position.z = 200 * Math.sin(phi) * Math.sin(theta);    
+
+	flag.theta = theta;
+	flag.phi = phi;
+	
     cities.push({'position': point.position.clone(), 'img': null, 'color' : color, 'size' : size, 'lat' : lat, 'lng' : lng, 'title' : title, 'desc' : description, 'price':price, 'link': 'http://www.flightcentre.co.uk'});
      
 	// scene.add(stopa);
@@ -510,11 +530,11 @@ DAT.Globe = function(container, opts) {
   var previousDistance = 0;
 
   function distanceBetweenEventPoints( pnt1, pnt2 ){
-      var x1 = pnt1.clientX;
-      var x2 = pnt2.clientX;
-      var y1 = pnt1.clientY;
-      var y2 = pnt2.clientY;
-      return Math.sqrt(Math.pow((x2 - x1), 2.0) + Math.pow((y2 - y1), 2.0));
+      return Math.sqrt(Math.pow((pnt2.clientX - pnt1.clientX), 2.0) + Math.pow((pnt2.clientY - pnt1.clientY), 2.0));
+  }
+  
+  function distanceBetweenPoints( pnt1, pnt2 ){
+      return Math.sqrt(Math.pow((pnt2.x - pnt1.x), 2.0) + Math.pow((pnt2.y - pnt1.y), 2.0));
   }
 
   function onTouchMove(event) {
@@ -616,7 +636,7 @@ DAT.Globe = function(container, opts) {
 			  complete : function(){
 				  $( path ).remove();
 			  },
-			  duration : 800
+			  duration : 1200
 		  });
   	    }
   	    
@@ -772,10 +792,23 @@ DAT.Globe = function(container, opts) {
 
     camera.lookAt(sphere.position);
   
-    renderer.render(scene, camera);
-    //keep track of the rotation
+  	//try to save the processor from repeated rendering
+  	if( mouseDownOn || distanceBetweenPoints( rotation, rotationPrev ) > 0.0001 ){
+	    
+		renderer.render(scene, camera);
+		rendererOverlay.render(sceneOverlay, camera);
+    
+		var angleLimit = 0.25;
+		flagMesh.forEach( function( flag ){
+			flag.lookAt( camera.position );//{x:flag.position.x,y:flag.position.y + 200,z:flag.position.z});
+			flag.visible = Math.sin( rotation.x + flag.theta ) > angleLimit && Math.sin( rotation.y + flag.phi ) > angleLimit;
+		} );
+	}
+    
+	//keep track of the rotation
     rotationPrev.x = rotation.x;
     rotationPrev.y = rotation.y;
+	
   }
 
   init();
