@@ -105,7 +105,7 @@
       display: none;
     }
 
-    #popup{
+    #popup, #popup-brochure{
       width: 667px;
       top: 50%;
       left: 50%;
@@ -116,6 +116,14 @@
       background-color: #ffffff;
       display: none;
       position: absolute;;
+    }
+
+    #popup-brochure{
+      width: 820px;
+      height: 600px;
+      padding: 10px;
+      margin-left: -415px;
+      margin-top: -310px;
     }
 
     #popup .content{
@@ -145,7 +153,16 @@
       float: right;
       margin: 10px;
     }
-    #popup .close{
+
+    #popup .view-brochure{
+          font-size: 30px;
+          font-weight: bold;
+          color: #DB030C;
+          float: left;
+          margin: 10px;
+     }
+
+    #popup .close, #popup-brochure .close{
       background-image:url(close-icon.png);
       background-size: 100%;
       width: 50px;
@@ -175,9 +192,14 @@
 </head>
 <body>
 
-<div id="container" touch-action="pan-x pan-y"></div>
+<div id="container"></div>
 
 <div id="overlay"></div>
+<div id="popup-brochure">
+  <a href="#" class="close"></a>
+  <div id="flipbook"></div>
+</div>
+
 <div id="popup">
   <a href="#" class="close"></a>
   <img src="banner-indian.jpg" />
@@ -185,8 +207,10 @@
     <h1 class="title">Indian Ocean - Dubai Escapes</h1>
     <h2>From <span class="price">&pound;755</span></h2>
     <p class="description">The vast Indian Ocean is home to some of the world’s most exotic and iconic islands, where paradise is characterised by tranquil azure lagoons, soft white sands, gently swaying palms and endless sapphire-blue skies. The low-lying islands of the Maldives are renowned for their wonderfully romantic stilted over-water villas and world-class diving, while Mauritius boasts centuries of diverse heritage, fascinating culture and a wealth of varying landscapes, from palm-fringed beaches to forest-covered mountains.</p>
-
+    <a href="#" class="view-brochure">View Brochure</a>
     <a href="#" class="call">800 587 0058</a>
+
+
   </div>
 
 </div>
@@ -215,47 +239,10 @@
 <script type="text/javascript" src="/globe/third-party/tween.js"></script>
 <script type="text/javascript" src="globe.js"></script>
 <script type="text/javascript" src="js/jquery-2.1.4.min.js"></script>
-<script type="text/javascript">
-
-  var globe = DAT.Globe(document.getElementById('container'), {
-    colorFn: function(label) {
-       //return new THREE.Color(0xEE0000);
-       return new THREE.Color(0xffffff);
-    }
-  });
-
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', '/Pixel/destinations.json', true);
-  xhr.onreadystatechange = function(e) {
-    if (xhr.readyState === 4) {
-      if (xhr.status === 200) {
-        var data = JSON.parse(xhr.responseText);
-        window.data = data;
-		var parsed_response = [];
-		
-		for (var i = 0; i < data.length; i++) {
-          		var k = data[i];
-				parsed_response.push.apply(parsed_response, data[i]);
-	
-          	}
-
-		globe.addData(data, {format: 'magnitude'});
-			
-		
-		/* for (var i=0; i<data.length; i++) {
-			alert(data[i]);
-			globe.addData(data[i], {format: 'magnitude'});
-		} */
-        // globe.addData(data, {format: 'magnitude'});
-        globe.createPoints();
-        globe.animate();
-        document.body.style.backgroundImage = 'none'; // remove loading
-      }
-    }
-  };
-  xhr.send(null);
-
-</script>
+<script type="text/javascript" src="js/pdf.js"></script>
+<script type="text/javascript" src="js/turnjs/turn.min.js"></script>
+<script type="text/javascript" src="js/pdfviewer.js"></script>
+<script type="text/javascript" src="js/main.js"></script>
 
 
 </body>
