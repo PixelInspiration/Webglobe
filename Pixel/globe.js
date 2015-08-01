@@ -646,7 +646,7 @@ DAT.Globe = function(container, opts) {
   }
 
  	$('#popup .close, #overlay').on('touchend, click', function(){
- 		$('#popup, #overlay').fadeOut();
+ 		$('#popup, #overlay, #popup-brochure').fadeOut();
  	});
 
   
