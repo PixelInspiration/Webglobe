@@ -18,7 +18,6 @@ $(function() {
 
 		PDFJS.getDocument('./pdf/flex.pdf').then(function(pdf) {
 			
-			
 			var totalPages = pdf.pdfInfo.numPages;
 			for(var i = 1; i <= totalPages; i ++){
 				pdf.getPage(i).then(function(page) {

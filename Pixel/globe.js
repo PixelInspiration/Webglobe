@@ -604,7 +604,7 @@ DAT.Globe = function(container, opts) {
   	    	setActiveCity(city);
   	    	//alert(cities[city].title);
           console.log(cities[city])
-          $('#popup .title').html(cities[city].title);
+          $('#popup .title').html(cities[city].title + '&nbsp;&nbsp;<img src="4-stars.png"/>');
           $('#popup .price').html(cities[city].price);
           $('#popup .description').html(cities[city].description);
   	      
