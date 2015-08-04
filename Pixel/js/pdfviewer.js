@@ -16,7 +16,7 @@ $(function() {
 
 	$('#flipbook').hide();
 
-		PDFJS.getDocument('./pdf/flex.pdf').then(function(pdf) {
+		PDFJS.getDocument('./pdf/publication.pdf').then(function(pdf) {
 			
 			var totalPages = pdf.pdfInfo.numPages;
 			for(var i = 1; i <= totalPages; i ++){
@@ -52,7 +52,7 @@ $(function() {
 		});
 		function initFlipBook(){
 				$("#flipbook").turn({
-					width: 820,
+					width: 1200,
 					height: 600,
 					autoCenter: true,
 					acceleration: true,
