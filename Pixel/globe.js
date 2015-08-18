@@ -420,7 +420,7 @@ DAT.Globe = function(container, opts) {
   function objectPick(event) {
   	
       var vector = new THREE.Vector3((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1, 0.5);
-
+      console.log(vector);
       //var vector = new THREE.Vector3((mouseOnDown.x / window.innerWidth) * 2 - 1, - (mouseOnDown.y / window.innerHeight) * 2 + 1, 0.5);
   
      projector.unprojectVector(vector, camera);
@@ -442,11 +442,12 @@ DAT.Globe = function(container, opts) {
       var city;
       var index = -1, best, dist;
 
+
       for (var i = 0; i < cities.length; i++) {
         city = cities[i].position.clone();
         city.sub(sphere.position).normalize();
-        dist = city.dot(point);
-  			
+        dist = city.dot(point) + 0.0020;
+  		  console.log(point, dist);
         if (index === -1 || dist > best) {
           index = i;
           best = dist;
@@ -540,6 +541,12 @@ DAT.Globe = function(container, opts) {
   function onTouchMove(event) {
   	 //multitouch
     if(event.touches.length > 1){
+
+      if(activeCity != -1){
+        event.stopPropagation(); 
+        event.preventDefault(); 
+        return false;
+      }
       
       var sep = distanceBetweenEventPoints(event.touches[0],event.touches[1]);
      
@@ -647,6 +654,7 @@ DAT.Globe = function(container, opts) {
 
  	$('#popup .close, #overlay').on('touchend, click', function(){
  		$('#popup, #overlay, #popup-brochure').fadeOut();
+    activeCity = -1;
  	});
 
   
